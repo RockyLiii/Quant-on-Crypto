@@ -1,0 +1,33 @@
+
+# 数据配置
+data:
+  folder_path: "/Users/lizeyu/Downloads/Quant-on-Crypto/data/5m_klines/"  # K线数据文件夹路径
+  raw_folder_path: "/Users/lizeyu/Downloads/Quant-on-Crypto/data/raw_data_leg/"  # K线数据文件夹路径
+  freq: "5m"  # K线频率
+
+# 回测配置
+backtest:
+  start_time: 1715851200000  # 回测起始时间 (Unix timestamp in milliseconds)
+  # end_time:   1730360700000    # 回测结束时间 (Unix timestamp in milliseconds)
+  end_time:  1718443200000 
+  d_t: 300000 # 5分钟 = 300000毫秒
+  initial_capital: 10000      # 初始资金
+  trading_fee: 0.001            # 交易手续费率
+output_path: "output"  # 日志和结果输出路径
+
+# 策略配置
+strategy:
+  name: "StatArbitrage"
+  feature_params:
+    regression_window: 50         # 回归窗口长度
+    lookback_period: 288          # 回溯步数（一天的5分钟K线数量）
+    correlation_window: 864      # 相关性窗口长度
+    std_rate: 0.01                # std_temp = np.sqrt(std_temp**2 * 0.99 + residual**2 * 0.01)
+  trading_params:
+    correlation_thres: 0.5        # 相关性上限要求
+    max_std: 0.1                  # 最大波动率限制
+    sigma_threshold: 2          # 残差偏离标准差的倍数阈值
+    lc_threshold: -0.03           # 止损
+    holding_period: 30            # 最大持有时间（以K线数量计）
+    max_drawback: 0.05            # 单次开仓最大回撤限制
+    bullet: 0.02                  # 子弹比例
