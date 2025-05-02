@@ -236,7 +236,7 @@ class BaseTimeline:
             self._capital
         ]], dtype=torch.float32)    #❓❓❓
 
-        self._total_value = self._capital + total_position_value + self._bond    #❓❓❓
+        self._total_value = self._capital + total_position_value + 2*self._bond    #❓❓❓
 
         value_record = torch.tensor([[
             self.current_timestamp,

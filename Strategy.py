@@ -141,19 +141,19 @@ class StatArbitrageStrategy(BaseStrategy):
 
                 # 新开仓
                 if (abs(residual) > self.sigma_threshold * std):
-                    self.count += 1
-                
-                    # and correlation < self.correlation_thres
-                    amount = 1/(beta*current_price_COIN+current_price_BTC)
-                    if residual > 0:
-                        signals[coin] += beta * amount
-                        signals['BTC'] -= amount
-                        self.signal_history[coin].append((current_timestamp, beta * amount, -amount, current_price_COIN))
+                    if std < self.max_std:
+                        self.count = 0
+                        # and correlation < self.correlation_thres
+                        amount = 1/(beta*current_price_COIN+current_price_BTC)
+                        if residual > 0:
+                            signals[coin] += beta * amount
+                            signals['BTC'] += -amount
+                            self.signal_history[coin].append((current_timestamp, beta * amount, -amount, current_price_COIN))
 
-                    else:
-                        signals[coin] -= beta * amount
-                        signals['BTC'] += amount
-                        self.signal_history[coin].append((current_timestamp, -beta * amount, amount, current_price_COIN))
+                        else:
+                            signals[coin] += -beta * amount
+                            signals['BTC'] += amount
+                            self.signal_history[coin].append((current_timestamp, -beta * amount, amount, current_price_COIN))
 
                 
 

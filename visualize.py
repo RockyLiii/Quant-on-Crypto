@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 def plot_time_series(time_series_dict, output_path="output", filename="chart.png", 
-                    title="Time Series Plot", ylabel="Value", time_unit='ms', d_t=None):
+                    title="Time Series Plot", ylabel="Value", time_unit='ms', d_t=None,start_time=None, end_time=None):
     """
     简洁地绘制多个时间序列
     Args:
@@ -42,7 +42,14 @@ def plot_time_series(time_series_dict, output_path="output", filename="chart.png
         })
         if d_t is not None:
             df['timestamp'] = df['timestamp'] * d_t
-        dfs[name] = df
+        
+        # 过滤时间范围
+        if start_time is not None and end_time is not None:
+            df = df[(df['timestamp'] >= start_time) & (df['timestamp'] <= end_time)]
+            
+        if len(df) > 0:  # 只添加非空的数据
+            dfs[name] = df
+    
     
     # 找到所有时间戳的交集
     timestamps = set(dfs[list(dfs.keys())[0]]['timestamp'])
@@ -91,21 +98,37 @@ def plot_time_series(time_series_dict, output_path="output", filename="chart.png
     
     return True
 # 为了向后兼容，保留原来的函数
-def plot_equity_curve(timeline, output_path="output", d_t=None):
+def plot_value_curve(timeline, output_path="output", d_t=None, start_time=None, end_time=None
+):
     """绘制资产曲线图"""
     return plot_time_series(
         time_series_dict={
-            'Total Value': timeline.total_value,
-            'Available Capital': timeline.capital,
+            'Total Value': timeline.total_value
         },
         output_path=output_path,
-        filename="asset_values.png",
-        title="Asset Values Comparison Over Time",
+        filename="values.png",
+        title="Values Over Time",
         ylabel="Value",
-        d_t=d_t
+        d_t=d_t,
+        start_time=start_time, end_time=end_time
+    )
+def plot_capital_curve(timeline, output_path="output", d_t=None, start_time=None, end_time=None
+):
+    """绘制资产曲线图"""
+    return plot_time_series(
+        time_series_dict={
+            'Available Capital': timeline.capital
+        },
+        output_path=output_path,
+        filename="capital.png",
+        title="Capital Over Time",
+        ylabel="Value",
+        d_t=d_t,
+        start_time=start_time, end_time=end_time
     )
 
-def plot_position_curve(timeline, output_path="output", d_t=None):
+def plot_position_curve(timeline, output_path="output", d_t=None, start_time=None, end_time=None
+):
     """绘制资产曲线图"""
     return plot_time_series(
         time_series_dict={
@@ -115,11 +138,12 @@ def plot_position_curve(timeline, output_path="output", d_t=None):
         filename="position_values.png",
         title="Position Values Over Time",
         ylabel="Value",
-        d_t=d_t
+        d_t=d_t,
+        start_time=start_time, end_time=end_time
     )
 
 
-def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=None):
+def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=None,        start_time=None, end_time=None):
     """Plot one feature for all coins in the same graph"""
     # Skip if no feature records
     if feature_name not in timeline.feature_records:
@@ -145,10 +169,12 @@ def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=Non
         filename=f"all_coins_{feature_name}.png",
         title=f"{feature_name.capitalize()} Values for All Coins",
         ylabel=feature_name.capitalize(),
-        d_t=d_t
+        d_t=d_t,
+        start_time=start_time, end_time=end_time
+
     )
 
-def plot_all_features(timeline, output_path="output", d_t=None):
+def plot_all_features(timeline, output_path="output", d_t=None, start_time=None, end_time=None):
     """Plot all features"""
     # Create output directory
     os.makedirs(output_path, exist_ok=True)

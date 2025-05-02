@@ -22,6 +22,7 @@ def analyze_results(timeline, config, logger):
     # 提取收益率数据
     capital = timeline.capital.numpy()
     total_value = timeline.total_value.numpy()
+    tradeamount = timeline.tradeamount
     
     # 转换为pandas DataFrame便于分析
     df = pd.DataFrame({
@@ -56,6 +57,7 @@ def analyze_results(timeline, config, logger):
     logger.info("\n====== 回测结果摘要 ======")
     logger.info(f"初始资金: {initial_capital:.2f}")
     logger.info(f"最终价值: {final_capital:.2f}")
+    logger.info(f"总交易量: {tradeamount:.2f}")
     logger.info(f"总收益率: {total_return:.2f}%")
     logger.info(f"最大回撤: {max_drawdown:.2f}%")
     logger.info(f"\n交易统计:")

@@ -8,8 +8,8 @@ data:
 # 回测配置
 backtest:
   start_time: 1715851200000  # 回测起始时间 (Unix timestamp in milliseconds)
-  # end_time:   1730360700000    # 回测结束时间 (Unix timestamp in milliseconds)
-  end_time:  1718443200000 
+  end_time:   1730360700000    # 回测结束时间 (Unix timestamp in milliseconds)
+  #end_time:  1718443200000 
   d_t: 300000 # 5分钟 = 300000毫秒
   initial_capital: 10000      # 初始资金
   trading_fee: 0.001            # 交易手续费率
@@ -26,7 +26,7 @@ strategy:
   trading_params:
     correlation_thres: 0.5        # 相关性上限要求
     max_std: 0.1                  # 最大波动率限制
-    sigma_threshold: 2          # 残差偏离标准差的倍数阈值
+    sigma_threshold: 2.5          # 残差偏离标准差的倍数阈值
     lc_threshold: -0.03           # 止损
     holding_period: 30            # 最大持有时间（以K线数量计）
     max_drawback: 0.05            # 单次开仓最大回撤限制
