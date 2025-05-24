@@ -96,19 +96,13 @@ def main():
             logger.info(f"资产曲线已保存至: {output_dir}/equity_curve.png")
 
             logger.info("生成特征曲线图...")
-            plot_all_features(timeline, output_dir, d_t=d_t,start_time = start_time, end_time = end_time)
+            plot_all_features(timeline, strategy, output_dir, d_t=d_t,start_time = start_time, end_time = end_time)
             logger.info(f"特征曲线已保存至: {output_dir}/features/")
                         
             # 分析回测结果
             with Timer("结果分析", logger):
-                metrics = analyze_results(timeline, config, logger)
+                metrics = analyze_results(timeline, strategy, config, logger)
                 
-                # 打印关键指标
-                logger.info("\n===== 策略绩效 =====")
-                logger.info(f"总收益率: {metrics['total_return']:.2f}%")
-                # logger.info(f"年化收益率: {metrics['annual_return']:.2f}%")
-                logger.info(f"最大回撤: {metrics['max_drawdown']:.2f}%")
-                # logger.info(f"夏普比率: {metrics['sharpe']:.2f}")
             
     except Exception as e:
         logger.error(f"回测过程中发生错误: {str(e)}", exc_info=True)

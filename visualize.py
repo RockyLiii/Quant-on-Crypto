@@ -143,7 +143,7 @@ def plot_position_curve(timeline, output_path="output", d_t=None, start_time=Non
     )
 
 
-def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=None,        start_time=None, end_time=None):
+def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=None, start_time=None, end_time=None):
     """Plot one feature for all coins in the same graph"""
     # Skip if no feature records
     if feature_name not in timeline.feature_records:
@@ -174,14 +174,336 @@ def plot_all_coin_features(timeline, feature_name, output_path="output", d_t=Non
 
     )
 
-def plot_all_features(timeline, output_path="output", d_t=None, start_time=None, end_time=None):
-    """Plot all features"""
+def plot_all_features(timeline, strategy, output_path="output", d_t=None, start_time=None, end_time=None):
+    """Plot all available features from the timeline"""
     # Create output directory
     os.makedirs(output_path, exist_ok=True)
     feature_path = os.path.join(output_path, 'features')
     os.makedirs(feature_path, exist_ok=True)
     
-    # Plot each feature
-    features = ['price', 'beta', 'residual', 'std']
+    # Get available features from timeline's feature records
+    features = list(timeline.feature_records.keys())
+    
+    # Plot each available feature
     for feature in features:
-        plot_all_coin_features(timeline, feature, feature_path, d_t)
+        plot_all_coin_features(timeline, feature, feature_path, d_t, start_time, end_time)
+    
+    # Plot revenue paths if available
+    if hasattr(strategy, 'coin_revenues_path'):
+        plot_coin_revenues(strategy, output_path, d_t, start_time, end_time)
+    # Plot residual deviation distribution
+    if hasattr(strategy, 'residual_deviate'):
+        plot_residual_deviation_distribution(strategy, output_path)
+    
+    if hasattr(strategy, 'residual_deviate_revenue'):
+        plot_ratio_revenue_analysis(strategy, output_path)
+
+    if hasattr(strategy, 'residual_deviate_revenue'):
+        plot_revenue_ratio_timeline(strategy, timeline, output_path, d_t, start_time, end_time)
+
+    # Plot correlations if either type exists
+    if (hasattr(timeline, 'correlation_price') or 
+        hasattr(timeline, 'correlation_residual')):
+        plot_correlation_timeline(timeline, output_path, d_t, start_time, end_time)
+
+def plot_coin_revenues(strategy, output_path="output", d_t=None, start_time=None, end_time=None):
+    """Plot cumulative revenue paths for all coins"""
+    plt.figure(figsize=(12, 6))
+    
+    for coin, revenue_path in strategy.coin_revenues_path.items():
+        if coin != 'BTC' and revenue_path:  # Skip BTC and empty paths
+            # Unzip the path into timestamps and values
+            timestamps, values = zip(*revenue_path)
+            
+            # Convert timestamps if d_t is provided
+            if d_t is not None:
+                timestamps = [ts * d_t for ts in timestamps]
+            
+            # Convert timestamps to datetime
+            dates = [pd.to_datetime(ts, unit='ms') for ts in timestamps]
+            
+            # Plot this coin's revenue path
+            plt.plot(dates, values, label=coin)
+    
+    plt.title('Cumulative Revenue by Coin')
+    plt.xlabel('Time')
+    plt.ylabel('Cumulative Revenue')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save plot
+    plt.savefig(os.path.join(output_path, 'coin_revenues.png'))
+    plt.close()
+
+def plot_residual_deviation_distribution(strategy, output_path="output"):
+    """
+    Plot residual deviation distribution for all coins
+    
+    Args:
+        strategy: Strategy instance containing residual_deviate data
+        output_path: Output directory for saving the plot
+    """
+    plt.figure(figsize=(12, 6))
+    
+    # Define bins with 0.2 intervals
+    bins = np.arange(0, 10.2, 0.2)  # From 0 to 10 with 0.2 intervals
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # Process each coin's data
+    for coin, data in strategy.residual_deviate.items():
+        if coin == 'BTC' or not data:
+            continue
+            
+        # Extract deviation values
+        timestamps, deviations = zip(*data)
+        deviations = np.array(deviations)
+        
+        # Calculate histogram
+        hist, _ = np.histogram(deviations, bins=bins, density=True)
+        
+        # Plot frequency distribution as line
+        plt.plot(bin_centers, hist, label=coin, alpha=0.7)
+    
+    plt.title('Residual Deviation Distribution by Coin')
+    plt.xlabel('Residual Deviation (|residual|/std)')
+    plt.ylabel('Frequency')
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save plot
+    os.makedirs(output_path, exist_ok=True)
+    plt.savefig(os.path.join(output_path, 'residual_deviation_dist.png'))
+    plt.close()
+
+def plot_ratio_revenue_analysis(strategy, output_path="output"):
+    """
+    Plot average revenue for different deviation ratios across all coins
+    
+    Args:
+        strategy: Strategy instance containing residual_deviate_revenue data
+        output_path: Output directory for saving the plot
+    """
+    plt.figure(figsize=(12, 6))
+    
+    # Define ratio bins with 0.1 intervals
+    bins = np.arange(0, 10.1, 0.1)  # From 0 to 10 with 0.1 intervals
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # Process each coin's data
+    for coin in strategy.residual_deviate_revenue.keys():
+        if coin == 'BTC' or not strategy.residual_deviate_revenue[coin]:
+            continue
+            
+        # Extract ratios and revenues
+        t, ratios, revenues = zip(*strategy.residual_deviate_revenue[coin])
+        ratios = np.array(ratios)
+        revenues = np.array(revenues)
+        
+        # Calculate average revenue for each ratio bin
+        avg_revenues = []
+        for i in range(len(bins)-1):
+            mask = (ratios >= bins[i]) & (ratios < bins[i+1])
+            if np.any(mask):
+                avg_revenues.append(np.mean(revenues[mask]))
+            else:
+                avg_revenues.append(np.nan)
+        
+        # Plot average revenues
+        plt.plot(bin_centers, avg_revenues, label=f'{coin}', alpha=0.7)
+    
+    plt.title('Average Revenue by Deviation Ratio')
+    plt.xlabel('Deviation Ratio (|residual|/std)')
+    plt.ylabel('Average Revenue')
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Add horizontal line at y=0
+    plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save plot
+    os.makedirs(output_path, exist_ok=True)
+    plt.savefig(os.path.join(output_path, 'ratio_revenue_analysis.png'))
+    plt.close()
+
+
+def plot_revenue_ratio_timeline(strategy, timeline, output_path="output", d_t=None, start_time=None, end_time=None):
+    """Plot revenue and ratio over time with freeze state background"""
+    plt.figure(figsize=(15, 8))
+    
+    # Create two y-axes
+    ax1 = plt.gca()
+    ax2 = ax1.twinx()
+    
+    # Process freeze states for background
+    if hasattr(timeline, 'freeze_history'):
+        freeze_times, states = zip(*timeline.freeze_history)
+        if d_t is not None:
+            freeze_times = [ts * d_t for ts in freeze_times]
+        freeze_dates = [pd.to_datetime(ts, unit='ms') for ts in freeze_times]
+        
+        # Color background based on freeze state
+        last_time = freeze_dates[0]
+        last_state = states[0]
+        for time, state in zip(freeze_dates[1:], states[1:]):
+            if state != last_state:
+                if last_state:
+                    plt.axvspan(last_time, time, color='red', alpha=0.1)
+                last_time = time
+                last_state = state
+    
+    # 使用字典存储每个时间点的数据
+    time_data = {}
+    
+    # 收集所有时间点的数据
+    for coin, data in strategy.residual_deviate_revenue.items():
+        if coin == 'BTC' or not data:
+            continue
+            
+        for timestamp, ratio, revenue in data:
+            if timestamp not in time_data:
+                time_data[timestamp] = {'ratios': [], 'revenues': []}
+            time_data[timestamp]['ratios'].append(ratio)
+            time_data[timestamp]['revenues'].append(revenue)
+    
+    # 计算每个时间点的平均值
+    all_times = []
+    all_ratios = []
+    all_revenues = []
+    
+    for timestamp in sorted(time_data.keys()):
+        all_times.append(timestamp)
+        all_ratios.append(np.mean(time_data[timestamp]['ratios']))
+        all_revenues.append(np.mean(time_data[timestamp]['revenues']))
+    
+    if not all_times:
+        plt.close()
+        return
+    
+    # Convert to numpy arrays
+    all_times = np.array(all_times)
+    all_ratios = np.array(all_ratios)
+    all_revenues = np.array(all_revenues)
+    
+    # Convert timestamps
+    if d_t is not None:
+        all_times = all_times * d_t
+    dates = [pd.to_datetime(ts, unit='ms') for ts in all_times]
+    
+    # Plot lines directly
+    line1 = ax1.plot(dates, all_revenues, label='Average Revenue', 
+                     color='blue', linewidth=2)
+    line2 = ax2.plot(dates, all_ratios, label='Average Ratio',
+                     color='orange', linewidth=2)
+    
+    # Customize axes
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Revenue', color='blue')
+    ax2.set_ylabel('Deviation Ratio', color='orange')
+    
+    ax1.tick_params(axis='y', labelcolor='blue')
+    ax2.tick_params(axis='y', labelcolor='orange')
+    
+    # Add legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    
+    plt.title('Revenue and Deviation Ratio Timeline')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    # Save plot
+    plt.savefig(os.path.join(output_path, 'revenue_ratio_timeline.png'), 
+                bbox_inches='tight')
+    plt.close()
+    
+    
+
+
+def plot_correlation_timeline(timeline, output_path="output", d_t=None, start_time=None, end_time=None):
+    """Plot correlations and value on the same graph"""
+    plt.figure(figsize=(15, 8))
+    
+    # Create two y-axes
+    ax1 = plt.gca()  # For correlations
+    ax2 = ax1.twinx()  # For value
+    
+    # Process and plot data series
+    window = 50  # Rolling window size
+    lines = []  # Store lines for legend
+    labels = []  # Store labels for legend
+    
+    def safe_convert_timestamps(timestamps):
+        
+        try:
+            processed_timestamps = []
+            for ts in timestamps:
+                if ts < 1000000000000:  # 1e12
+                    ts = ts * d_t if d_t is not None else ts
+                processed_timestamps.append(pd.to_datetime(ts, unit='ms'))
+            return processed_timestamps
+        except Exception as e:
+            # Fallback to relative timestamps if conversion fails
+            min_ts = min(timestamps)
+            return [pd.to_datetime(ts - min_ts, unit='ms') for ts in timestamps]
+    
+    # 1. Plot price correlation
+    if hasattr(timeline, 'correlation_price') and timeline.correlation_price:
+        times, corrs = zip(*timeline.correlation_price)
+        dates = safe_convert_timestamps(times)
+        
+        rolling_mean = pd.Series(corrs).rolling(window=window, min_periods=1).mean()
+        line1, = ax1.plot(dates, rolling_mean, color='blue', linewidth=2, label='Price Correlation')
+        lines.append(line1)
+        labels.append('Price Correlation')
+    
+    # 2. Plot residual correlation
+    if hasattr(timeline, 'correlation_residual') and timeline.correlation_residual:
+        times, corrs = zip(*timeline.correlation_residual)
+        dates = safe_convert_timestamps(times)
+        
+        rolling_mean = pd.Series(corrs).rolling(window=window, min_periods=1).mean()
+        line2, = ax1.plot(dates, rolling_mean, color='green', linewidth=2, label='Residual Correlation')
+        lines.append(line2)
+        labels.append('Residual Correlation')
+    
+    # 3. Plot total value
+    if hasattr(timeline, 'total_value') and len(timeline.total_value) > 0:
+        values = timeline.total_value.numpy()
+        times = values[:, 0]
+        vals = values[:, 1]
+        dates = safe_convert_timestamps(times)
+        
+        line3, = ax2.plot(dates, vals, color='orange', linewidth=2, 
+                         linestyle='--', label='Total Value')
+        lines.append(line3)
+        labels.append('Total Value')
+    
+    # Rest of the function remains the same
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Correlation', color='black')
+    ax2.set_ylabel('Total Value', color='orange')
+    
+    ax1.tick_params(axis='y', labelcolor='black')
+    ax2.tick_params(axis='y', labelcolor='orange')
+    
+    ax1.axhline(y=0.5, color='red', linestyle='--', alpha=0.5)
+    ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+    
+    plt.legend(lines, labels, loc='upper left')
+    plt.title('Market Correlations and Total Value')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(output_path, 'correlation_value_timeline.png'), 
+                bbox_inches='tight')
+    plt.close()

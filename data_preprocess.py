@@ -17,6 +17,42 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
         logger: 日志记录器
     """
     raw_folder = config['data']['raw_folder_path']
+
+    # Standardize timestamps in raw files
+    logger.info("开始标准化原始时间戳...")
+    for filename in os.listdir(raw_folder):
+        if filename.endswith("_klines_5m.csv"):
+            file_path = os.path.join(raw_folder, filename)
+            temp_path = os.path.join(raw_folder, f"temp_{filename}")
+            
+            try:
+                with open(file_path, 'r') as infile, open(temp_path, 'w') as outfile:
+                    # Copy header
+                    header = next(infile)
+                    outfile.write(header)
+                    
+                    # Process each line
+                    for line in infile:
+                        parts = line.strip().split(',')
+                        timestamp = float(parts[0])
+                        close_time = float(parts[6])
+                        
+                        if 2000000000000 < timestamp < 2000000000000000:
+                            parts[0] = f"{timestamp*1000:.0f}"
+                            parts[6] = f"{close_time*1000:.0f}"
+                            
+                        outfile.write(','.join(parts) + '\n')
+                
+                # Replace original file with updated one
+                os.replace(temp_path, file_path)
+                logger.info(f"已标准化 {filename} 的时间戳")
+                
+            except Exception as e:
+                logger.error(f"处理 {filename} 时出错: {e}")
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                continue  
+
     output_folder = config['data']['folder_path']
     d_t = config['backtest']['d_t']  # 时间间隔，用于标准化时间戳
     start_time = config['backtest']['start_time'] 
@@ -35,6 +71,7 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
         if filename.endswith("_klines_5m.csv"):
             coin = filename.split("_")[0]
             file_path = os.path.join(raw_folder, filename)
+            
             coin_files[coin] = file_path
             
             # 读取该币种的所有时间戳
