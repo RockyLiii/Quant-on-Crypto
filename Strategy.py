@@ -13,25 +13,10 @@ class BaseStrategy(ABC):
         """Initialize strategy base class"""
         self.params = params or {}
         self.timeline = None
-        
-        # Feature parameters
-        feature_params = self.params.get('strategy', {}).get('feature_params', {})
-        self.regression_window = feature_params.get('regression_window', 50)
-        self.lookback_period = feature_params.get('lookback_period', 338)
-        
-        # Trading parameters
-        trading_params = self.params.get('strategy', {}).get('trading_params', {})
-        self.max_holding_period = trading_params.get('holding_period', 30)
-        self.trading_fee = trading_params.get('trading_fee', 0.001)
-        
+
         # State tracking
         self.signal_history = defaultdict(lambda: deque(maxlen=self.max_holding_period))
         
-        # Performance metrics
-        self.revenue_rates = []
-        self.coin_revenues = defaultdict(float)
-        self.coin_revenues_path = defaultdict(list)
-
     @abstractmethod
     def get_feature_configs(self) -> Dict[str, Dict[str, Dict[str, int]]]:
         """Return feature configuration dictionary"""
@@ -231,7 +216,6 @@ class BaseStrategy(ABC):
 
 
 class StatArbitrageStrategy(BaseStrategy):
-
     def __init__(self, params: dict = None):
         self.params = params or {}
         super().__init__(params)
