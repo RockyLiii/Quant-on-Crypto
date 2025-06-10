@@ -25,7 +25,7 @@ def standardize_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
     
-def preprocess_data(config: dict, logger: logging.Logger) -> None:
+def preprocess_data(config: dict, raw_folder, output_folder, freq, stan_dict: dict, logger: logging.Logger) -> None:
     """
     预处理原始数据:
     1. 对齐各币种时间戳
@@ -36,9 +36,8 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
         config: 配置字典，包含数据路径和回测参数
         logger: 日志记录器
     """
-    raw_folder = config['data']['raw_folder_path']
-    output_folder = config['data']['folder_path']
-    d_t = 300000
+
+    d_t = 60000
     start_time = config['backtest']['start_time']
     end_time = config['backtest']['end_time']
     
@@ -49,13 +48,16 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
                'close_time', 'quote_volume', 'trades', 
                'taker_buy_base', 'taker_buy_quote', 'ignore']
     
+    kline_suffix = f"_klines_{freq}.csv"
+    logger.info(f"处理K线频率: {freq}")
+    
     # 1. 收集所有币种的时间戳
     logger.info("开始收集时间戳...")
     all_timestamps: List[Set[float]] = []
     coin_files = {}
     
     for filename in os.listdir(raw_folder):
-        if not filename.endswith("_klines_5m.csv"):
+        if not filename.endswith(kline_suffix):
             continue
             
         coin = filename.split("_")[0]
@@ -133,9 +135,19 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
             except (IndexError, ValueError) as e:
                 logger.error(f"{coin} 获取初始价格失败: {e}")
                 continue
-            
+
+
+            # Get or set standardization price
+            if coin not in stan_dict:
+                stan_dict[coin] = initial_close
+            else:
+                initial_close = stan_dict[coin]
+                logger.info(f"使用已存在的标准化价格 {coin}: {initial_close}")
+
+                
             # 归一化价格数据
             price_columns = ['open', 'high', 'low', 'close']
+
             for col in price_columns:
                 df[col] = df[col].astype(float) / initial_close
             
@@ -146,7 +158,7 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
                 logger.warning(f"{coin} 存在时间间隔异常，最大间隔: {gaps.max()}")
             
             # 保存处理后的数据
-            output_path = os.path.join(output_folder, f"{coin}_klines_5m.csv")
+            output_path = os.path.join(output_folder, f"{coin}_klines_{freq}.csv")
             df.to_csv(output_path, index=False)
             
             logger.info(f"处理完成 {coin}，保存了 {len(df)} 行数据" + 
@@ -162,7 +174,7 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
     reference_timestamps = None
     
     for filename in os.listdir(output_folder):
-        if not filename.endswith("_klines_5m.csv"):
+        if not filename.endswith(kline_suffix):
             continue
             
         df = pd.read_csv(os.path.join(output_folder, filename))

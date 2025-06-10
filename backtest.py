@@ -132,7 +132,6 @@ def analyze_performance(timeline: BaseTimeline, logger: logging.Logger) -> None:
         logger.info(f"\n{feature} 特征:")
         logger.info(f"初始时间: {feature_times[0]:.4f}s")
         logger.info(f"最终时间: {feature_times[-1]:.4f}s")
-
 def run_backtest(strategy: BaseStrategy, logger: logging.Logger, backtest_params: dict, progress_callback=None) -> Dict:
     """执行回测"""
     timeline = StatArbitrageTimeline(
@@ -148,10 +147,10 @@ def run_backtest(strategy: BaseStrategy, logger: logging.Logger, backtest_params
 
     # Initialize data dictionary
     data_dict = {}
-    for filename in os.listdir(backtest_params['data']['folder_path']):
+    for filename in os.listdir(backtest_params['data']['trading_folder_path']):
         if filename.endswith('_klines_5m.csv'):
             coin = filename.split('_')[0]
-            file_path = os.path.join(backtest_params['data']['folder_path'], filename)
+            file_path = os.path.join(backtest_params['data']['trading_folder_path'], filename)
             df = pd.read_csv(file_path)
             data_dict[coin] = df
             timeline._initialize_for_coin(coin)
@@ -160,6 +159,9 @@ def run_backtest(strategy: BaseStrategy, logger: logging.Logger, backtest_params
     
     # Get common timestamps
     all_timestamps = sorted(set.intersection(*[set(df['timestamp']) for df in data_dict.values()]))
+    start_timestamp = all_timestamps[0]
+    end_timestamp = all_timestamps[-1]
+
     total_len = len(all_timestamps)
     logger.info(f"Found {total_len} common timestamps")
 
@@ -172,53 +174,54 @@ def run_backtest(strategy: BaseStrategy, logger: logging.Logger, backtest_params
 
     # Process timestamps with progress tracking
     loop_start = time.time()
+    i = 0
 
-    for i, timestamp in enumerate(all_timestamps):
-        try:
-            # 判断是否是最后两个时间戳
-            is_last2_timestamp = (i == len(all_timestamps) - 2)
-            is_last_timestamp = (i == len(all_timestamps) - 1)
+    for timestamp in range(start_timestamp, end_timestamp + 1):  # 每5分钟一个时间戳
 
-            data_start = time.time()
-            new_data = {}
-            
-            # Collect data for this timestamp
-            for coin, df in data_dict.items():
-                row = df[df['timestamp'] == timestamp]
-                if not row.empty:
-                    new_data[coin] = torch.tensor(row.values[0], dtype=torch.float32).unsqueeze(0)
-            data_update_time += time.time() - data_start
 
-            if new_data:
-                # 1. 更新时间线和计算特征
-                feature_start = time.time()
-                timeline.time_pass(new_data)
-                feature_calc_time += time.time() - feature_start
-                
-                if is_last2_timestamp:
-                    # 在倒数第二个时间戳执行强制平仓
-                    logger.info("执行最终平仓操作")
-                    POSITION_THRESHOLD = 0.0001  # 设置最小仓位阈值
-                    
-                    for coin in timeline.coins:
-                        current_position = timeline.coin_features['position_size']['data'][coin][-1]
-                        if abs(current_position) > POSITION_THRESHOLD:
-                            logger.info(f"平仓 {coin}: {current_position:.4f}")
-                            timeline.trade(coin, -current_position)  # 生成反向交易信号
-                
-                elif is_last_timestamp:
-                    # 最后一个时间戳只记录最终状态
-                    for coin in timeline.coins:
-                        timeline.trade(coin, 0)
-                
-                else:
-                    # 正常交易时段
-                    signals = strategy.analyze_features()
-                    for coin, signal in signals.items():
-                        timeline.trade(coin, signal)
+        if timestamp not in all_timestamps:
+            continue
+        is_last2_timestamp = (timestamp == all_timestamps[-2])
+        is_last_timestamp = (timestamp == all_timestamps[-1])
+
+        data_start = time.time()
+        new_data = {}
+        
+        # Collect data for this timestamp
+        for coin, df in data_dict.items():
+            row = df[df['timestamp'] == timestamp]
+            if not row.empty:
+                new_data[coin] = torch.tensor(row.values[0], dtype=torch.float32).unsqueeze(0)
+        data_update_time += time.time() - data_start
+
+        if new_data:
+            # 1. 更新时间线和计算特征
+            feature_start = time.time()
+            timeline.time_pass(new_data)
+            feature_calc_time += time.time() - feature_start
             
+            if is_last2_timestamp:
+                # 在倒数第二个时间戳执行强制平仓
+                logger.info("执行最终平仓操作")
+                POSITION_THRESHOLD = 0.0001  # 设置最小仓位阈值
+                
+                for coin in timeline.coins:
+                    current_position = timeline.coin_features['position_size']['data'][coin][-1]
+                    if abs(current_position) > POSITION_THRESHOLD:
+                        logger.info(f"平仓 {coin}: {current_position:.4f}")
+                        timeline.trade(coin, -current_position)  # 生成反向交易信号
             
-            # Print comprehensive timing stats every 1000 timestamps
+            elif is_last_timestamp:
+                # 最后一个时间戳只记录最终状态
+                for coin in timeline.coins:
+                    timeline.trade(coin, 0)
+            
+            else:
+                # 正常交易时段
+                signals = strategy.analyze_features()
+                for coin, signal in signals.items():
+                    timeline.trade(coin, signal)
+            i+=1
             if i > 0 and i % 1000 == 0:
                 total_time = time.time() - loop_start
                 logger.info(f"\n=== 性能统计 [{i}/{total_len}] ===")
@@ -228,10 +231,6 @@ def run_backtest(strategy: BaseStrategy, logger: logging.Logger, backtest_params
                 logger.info(f"特征计算与交易时间: {feature_calc_time:.4f}s ({feature_calc_time/total_time*100:.1f}%)")
                 logger.info("========================\n")
             
-        except Exception as e:
-            logger.error(f"Error at timestamp {timestamp} (index {i}): {str(e)}")
-            logger.error("Detailed error:", exc_info=True)
-            raise
         
     analyze_performance(timeline, logger)
     

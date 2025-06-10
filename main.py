@@ -42,7 +42,19 @@ def main():
             if config.get('preprocess_data', True):  # 可以通过配置控制是否执行预处理
                 logger.info("开始预处理数据...")
                 with Timer("数据预处理", logger):
-                    preprocess_data(config, logger)
+
+                    trading_raw_folder = config['data']['trading_raw_folder_path']
+                    trading_output_folder = config['data']['trading_folder_path']
+                    trading_freq = config['data']['trading_freq']
+
+                    marketsimu_raw_folder = config['data']['marketsimu_raw_folder_path']
+                    marketsimu_output_folder = config['data']['marketsimu_folder_path']
+                    marketsimu_freq = config['data']['marketsimu_freq']
+
+                    stan_dict = {}
+    
+                    preprocess_data(config, trading_raw_folder, trading_output_folder, trading_freq, stan_dict, logger)
+                    preprocess_data(config, marketsimu_raw_folder, marketsimu_output_folder, marketsimu_freq, stan_dict, logger)
                     pass
                 logger.info("数据预处理完成")
             logger.info("初始化策略...")
@@ -82,7 +94,7 @@ def main():
             
             logger.info("回测完成")
             # 获取配置中的时间间隔
-            d_t = 300000
+            d_t = 60000
             print(f"回测时间间隔: {d_t}")
             
             # 生成资产曲线图，传入d_t以还原时间戳

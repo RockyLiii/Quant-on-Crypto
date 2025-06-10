@@ -1,14 +1,18 @@
 
 # 数据配置
 data:
-  folder_path: "/Users/lizeyu/Downloads/Quant-on-Crypto/data/5m_klines/"  # K线数据文件夹路径
-  raw_folder_path: "/Users/lizeyu/Downloads/Quant-on-Crypto/data/5m_klines_n/"  # K线数据文件夹路径
-  freq: "5m"  # K线频率
+  trading_folder_path: "./data/5m_klines/"
+  trading_raw_folder_path: "./data/5m_klines_n/"   
+  trading_freq: "5m"  # K线频率
+
+  marketsimu_folder_path: "./data/1m_klines/"
+  marketsimu_raw_folder_path: "./data/1m_klines_n/" 
+  marketsimu_freq: "1m"  # K线频率
 
 # 回测配置
 backtest:
   start_time: 1738368000000  # 101
-  end_time: 1748735700000
+  end_time: 1739606400000
   initial_capital: 10000      # 初始资金
   trading_fee: 0.0005            # 交易手续费率
 output_path: "output"  # 日志和结果输出路径
@@ -26,3 +30,5 @@ strategy:
     sigma_threshold_u: 4         # 残差偏离标准差的倍数阈值
     lc_threshold: -0.99           # 止损
     holding_period: 60            # 最大持有时间（以K线数量计）
+
+    order_time: 3
