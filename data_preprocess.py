@@ -4,7 +4,27 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Set
 import logging
+def has_header(file_path: str) -> bool:
+    """Check if CSV file has a header"""
+    try:
+        with open(file_path, 'r') as f:
+            first_line = f.readline().strip().split(',')
+            # Check if first line contains any non-numeric values (likely headers)
+            return any(not val.replace('.', '').replace('-', '').isdigit() for val in first_line)
+    except Exception:
+        return False
 
+def standardize_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize timestamp format to milliseconds"""
+    # Check each timestamp individually
+    mask = (df['timestamp'] > 2000000000000) & (df['timestamp'] < 2000000000000000)
+    if mask.any():
+        # Only convert timestamps that are in microseconds
+        df.loc[mask, 'timestamp'] = (df.loc[mask, 'timestamp'] / 1000).astype('int64')
+        df.loc[mask, 'close_time'] = (df.loc[mask, 'close_time'] / 1000).astype('int64')
+    return df
+
+    
 def preprocess_data(config: dict, logger: logging.Logger) -> None:
     """
     预处理原始数据:
@@ -17,50 +37,17 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
         logger: 日志记录器
     """
     raw_folder = config['data']['raw_folder_path']
-
-    # Standardize timestamps in raw files
-    logger.info("开始标准化原始时间戳...")
-    for filename in os.listdir(raw_folder):
-        if filename.endswith("_klines_5m.csv"):
-            file_path = os.path.join(raw_folder, filename)
-            temp_path = os.path.join(raw_folder, f"temp_{filename}")
-            
-            try:
-                with open(file_path, 'r') as infile, open(temp_path, 'w') as outfile:
-                    # Copy header
-                    header = next(infile)
-                    outfile.write(header)
-                    
-                    # Process each line
-                    for line in infile:
-                        parts = line.strip().split(',')
-                        timestamp = float(parts[0])
-                        close_time = float(parts[6])
-                        
-                        if 2000000000000 < timestamp < 2000000000000000:
-                            parts[0] = f"{timestamp*1000:.0f}"
-                            parts[6] = f"{close_time*1000:.0f}"
-                            
-                        outfile.write(','.join(parts) + '\n')
-                
-                # Replace original file with updated one
-                os.replace(temp_path, file_path)
-                logger.info(f"已标准化 {filename} 的时间戳")
-                
-            except Exception as e:
-                logger.error(f"处理 {filename} 时出错: {e}")
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                continue  
-
     output_folder = config['data']['folder_path']
-    d_t = config['backtest']['d_t']  # 时间间隔，用于标准化时间戳
-    start_time = config['backtest']['start_time'] 
-    end_time = config['backtest']['end_time'] 
+    d_t = 300000
+    start_time = config['backtest']['start_time']
+    end_time = config['backtest']['end_time']
     
     # 确保输出目录存在
     os.makedirs(output_folder, exist_ok=True)
-    logger.info(f"使用时间间隔 d_t={d_t} 进行标准化")
+    
+    columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 
+               'close_time', 'quote_volume', 'trades', 
+               'taker_buy_base', 'taker_buy_quote', 'ignore']
     
     # 1. 收集所有币种的时间戳
     logger.info("开始收集时间戳...")
@@ -68,27 +55,36 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
     coin_files = {}
     
     for filename in os.listdir(raw_folder):
-        if filename.endswith("_klines_5m.csv"):
-            coin = filename.split("_")[0]
-            file_path = os.path.join(raw_folder, filename)
+        if not filename.endswith("_klines_5m.csv"):
+            continue
             
-            coin_files[coin] = file_path
-            
-            # 读取该币种的所有时间戳
-            timestamps = set()
-            with open(file_path, 'r') as f:
-                next(f)  # Skip header
-                for line in f:
-                    try:
-                        timestamp = float(line.strip().split(',')[0])
-                        if start_time <= timestamp <= end_time:
-                            timestamps.add(timestamp)
-                    except (ValueError, IndexError):
-                        continue
-            
-            if timestamps:
-                all_timestamps.append(timestamps)
-                logger.info(f"收集到 {coin} 的 {len(timestamps)} 个时间戳")
+        coin = filename.split("_")[0]
+        file_path = os.path.join(raw_folder, filename)
+        coin_files[coin] = file_path
+        
+        # 检查是否有表头
+        has_header_row = has_header(file_path)
+        logger.info(f"{coin}: {'有' if has_header_row else '没有'}表头")
+        
+        # 读取该币种的所有时间戳
+        timestamps = set()
+        with open(file_path, 'r') as f:
+            if has_header_row:
+                next(f)  # Skip header if exists
+            for line in f:
+                try:
+                    timestamp = float(line.strip().split(',')[0])
+                    # Standardize timestamp to milliseconds if needed
+                    if 2000000000000 < timestamp < 2000000000000000:
+                        timestamp /= 1000
+                    # Check time range after standardization
+                    if start_time <= timestamp <= end_time:
+                        timestamps.add(timestamp)
+                except (ValueError, IndexError):
+                    continue
+        if timestamps:
+            all_timestamps.append(timestamps)
+            logger.info(f"收集到 {coin} 的 {len(timestamps)} 个时间戳")
     
     # 2. 找出共同的时间戳并标准化
     common_timestamps = sorted(set.intersection(*all_timestamps))
@@ -96,52 +92,70 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
     logger.info(f"找到 {len(common_timestamps)} 个共同时间戳")
     logger.info(f"标准化后时间戳范围: {min(normalized_timestamps)} 到 {max(normalized_timestamps)}")
     
-    # 3. 对每个币种的数据进行处理并保存
-    columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 
-              'close_time', 'quote_volume', 'trades', 
-              'taker_buy_base', 'taker_buy_quote', 'ignore']
-    
+    # 3. 处理每个币种的数据
     for coin, input_path in coin_files.items():
-        # 读取数据到DataFrame
-        df = pd.read_csv(input_path, names=columns)
-        
-        # 标准化时间戳
-        df['timestamp'] = (df['timestamp'] / d_t).astype(int)
-        df['close_time'] = (df['close_time'] / d_t).astype(int)
-        
-        # 筛选共同时间戳的数据
-        df = df[df['timestamp'].isin(normalized_timestamps)]
-        
-        # 按时间戳排序
-        df = df.sort_values('timestamp')
-        initial_close = df['close'].iloc[0]
-        logger.info(f"{coin} 初始价格: {initial_close}")
-        
-        # 将所有价格列除以初始收盘价
-        price_columns = ['open', 'high', 'low', 'close']
-        for col in price_columns:
-            df[col] = df[col] / initial_close
-        
-        # 检查数据连续性
-        timestamps = df['timestamp'].values
-        gaps = np.diff(timestamps)
-        if not np.all(gaps == 1):
-            logger.warning(f"{coin} 存在时间间隔异常，最大间隔: {gaps.max()}")
+        try:
+            # 检查文件是否有表头
+            has_header_row = has_header(input_path)
             
-        # 保存处理后的数据
-        output_path = os.path.join(output_folder, f"{coin}_klines_5m.csv")
-        df.to_csv(output_path, index=False)
-        
-        logger.info(f"处理完成 {coin}，保存了 {len(df)} 行数据" + 
-                   ("（覆盖已存在文件）" if os.path.exists(output_path) else ""))
-        
-        # 验证数据
-        min_ts = df['timestamp'].min()
-        max_ts = df['timestamp'].max()
-        logger.info(f"{coin} 时间范围: {min_ts} 到 {max_ts}")
-        
-    logger.info("数据预处理完成")
+            # 读取数据到DataFrame
+            df = pd.read_csv(input_path, 
+                           names=columns,
+                           header=0 if has_header_row else None)
+            
+            if df.empty:
+                logger.warning(f"{coin} 数据为空，跳过处理")
+                continue
+                
+            # 标准化时间戳格式（确保使用毫秒）
+            df = standardize_timestamp(df)
+            
+            # 标准化时间戳除以d_t
+            df['timestamp'] = (df['timestamp'] / d_t).astype(int)
+            df['close_time'] = (df['close_time'] / d_t).astype(int)
 
+            
+            
+            # 筛选共同时间戳的数据
+            df = df[df['timestamp'].isin(normalized_timestamps)]
+            
+            if df.empty:
+                logger.warning(f"{coin} 筛选后没有数据，跳过处理")
+                continue
+            
+            # 按时间戳排序
+            df = df.sort_values('timestamp')
+            
+            # 安全地获取初始收盘价
+            try:
+                initial_close = float(df['close'].iloc[0])
+                logger.info(f"{coin} 初始价格: {initial_close}")
+            except (IndexError, ValueError) as e:
+                logger.error(f"{coin} 获取初始价格失败: {e}")
+                continue
+            
+            # 归一化价格数据
+            price_columns = ['open', 'high', 'low', 'close']
+            for col in price_columns:
+                df[col] = df[col].astype(float) / initial_close
+            
+            # 检查数据连续性
+            timestamps = df['timestamp'].values
+            gaps = np.diff(timestamps)
+            if not np.all(gaps == 1):
+                logger.warning(f"{coin} 存在时间间隔异常，最大间隔: {gaps.max()}")
+            
+            # 保存处理后的数据
+            output_path = os.path.join(output_folder, f"{coin}_klines_5m.csv")
+            df.to_csv(output_path, index=False)
+            
+            logger.info(f"处理完成 {coin}，保存了 {len(df)} 行数据" + 
+                       ("（覆盖已存在文件）" if os.path.exists(output_path) else ""))
+            
+        except Exception as e:
+            logger.error(f"处理 {coin} 时发生错误: {str(e)}")
+            continue
+    
     # 4. 数据验证
     logger.info("\n开始验证数据一致性...")
     first_file = True
@@ -162,5 +176,5 @@ def preprocess_data(config: dict, logger: logging.Logger) -> None:
                 logger.error(f"时间戳不一致: {filename}")
                 diff = reference_timestamps.symmetric_difference(current_timestamps)
                 logger.error(f"差异时间戳: {sorted(diff)[:10]}...")
-            
+    
     logger.info("数据验证完成")

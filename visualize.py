@@ -198,9 +198,6 @@ def plot_all_features(timeline, strategy, output_path="output", d_t=None, start_
     if hasattr(strategy, 'residual_deviate_revenue'):
         plot_ratio_revenue_analysis(strategy, output_path)
 
-    if hasattr(strategy, 'residual_deviate_revenue'):
-        plot_revenue_ratio_timeline(strategy, timeline, output_path, d_t, start_time, end_time)
-
     # Plot correlations if either type exists
     if (hasattr(timeline, 'correlation_price') or 
         hasattr(timeline, 'correlation_residual')):
@@ -334,98 +331,6 @@ def plot_ratio_revenue_analysis(strategy, output_path="output"):
     plt.savefig(os.path.join(output_path, 'ratio_revenue_analysis.png'))
     plt.close()
 
-
-def plot_revenue_ratio_timeline(strategy, timeline, output_path="output", d_t=None, start_time=None, end_time=None):
-    """Plot revenue and ratio over time with freeze state background"""
-    plt.figure(figsize=(15, 8))
-    
-    # Create two y-axes
-    ax1 = plt.gca()
-    ax2 = ax1.twinx()
-    
-    # Process freeze states for background
-    if hasattr(timeline, 'freeze_history'):
-        freeze_times, states = zip(*timeline.freeze_history)
-        if d_t is not None:
-            freeze_times = [ts * d_t for ts in freeze_times]
-        freeze_dates = [pd.to_datetime(ts, unit='ms') for ts in freeze_times]
-        
-        # Color background based on freeze state
-        last_time = freeze_dates[0]
-        last_state = states[0]
-        for time, state in zip(freeze_dates[1:], states[1:]):
-            if state != last_state:
-                if last_state:
-                    plt.axvspan(last_time, time, color='red', alpha=0.1)
-                last_time = time
-                last_state = state
-    
-    # 使用字典存储每个时间点的数据
-    time_data = {}
-    
-    # 收集所有时间点的数据
-    for coin, data in strategy.residual_deviate_revenue.items():
-        if coin == 'BTC' or not data:
-            continue
-            
-        for timestamp, ratio, revenue in data:
-            if timestamp not in time_data:
-                time_data[timestamp] = {'ratios': [], 'revenues': []}
-            time_data[timestamp]['ratios'].append(ratio)
-            time_data[timestamp]['revenues'].append(revenue)
-    
-    # 计算每个时间点的平均值
-    all_times = []
-    all_ratios = []
-    all_revenues = []
-    
-    for timestamp in sorted(time_data.keys()):
-        all_times.append(timestamp)
-        all_ratios.append(np.mean(time_data[timestamp]['ratios']))
-        all_revenues.append(np.mean(time_data[timestamp]['revenues']))
-    
-    if not all_times:
-        plt.close()
-        return
-    
-    # Convert to numpy arrays
-    all_times = np.array(all_times)
-    all_ratios = np.array(all_ratios)
-    all_revenues = np.array(all_revenues)
-    
-    # Convert timestamps
-    if d_t is not None:
-        all_times = all_times * d_t
-    dates = [pd.to_datetime(ts, unit='ms') for ts in all_times]
-    
-    # Plot lines directly
-    line1 = ax1.plot(dates, all_revenues, label='Average Revenue', 
-                     color='blue', linewidth=2)
-    line2 = ax2.plot(dates, all_ratios, label='Average Ratio',
-                     color='orange', linewidth=2)
-    
-    # Customize axes
-    ax1.set_xlabel('Time')
-    ax1.set_ylabel('Revenue', color='blue')
-    ax2.set_ylabel('Deviation Ratio', color='orange')
-    
-    ax1.tick_params(axis='y', labelcolor='blue')
-    ax2.tick_params(axis='y', labelcolor='orange')
-    
-    # Add legend
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
-    
-    plt.title('Revenue and Deviation Ratio Timeline')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    
-    # Save plot
-    plt.savefig(os.path.join(output_path, 'revenue_ratio_timeline.png'), 
-                bbox_inches='tight')
-    plt.close()
-    
     
 
 

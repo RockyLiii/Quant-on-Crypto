@@ -82,7 +82,7 @@ def main():
             
             logger.info("回测完成")
             # 获取配置中的时间间隔
-            d_t = config['backtest']['d_t']
+            d_t = 300000
             print(f"回测时间间隔: {d_t}")
             
             # 生成资产曲线图，传入d_t以还原时间戳

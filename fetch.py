@@ -52,6 +52,7 @@ def extract_and_read_csv(zip_path, output_dir):
 
 def download_and_merge(symbol, interval, start_date, end_date, output_dir):
     all_data = []
+    zip_files = []  # Track zip files for cleanup
     current_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
@@ -60,10 +61,19 @@ def download_and_merge(symbol, interval, start_date, end_date, output_dir):
         success = download_zip_monthly(symbol, interval, year, month, output_dir)
         if success:
             zip_file = os.path.join(output_dir, f"{symbol}-{interval}-{year}-{month:02d}.zip")
+            zip_files.append(zip_file)  # Add to cleanup list
             dfs = extract_and_read_csv(zip_file, output_dir)
             all_data.extend(dfs)
         current_dt += timedelta(days=32)
         current_dt = current_dt.replace(day=1)
+
+    # Cleanup zip files
+    for zip_file in zip_files:
+        try:
+            os.remove(zip_file)
+            print(f"🗑️ 删除临时文件: {zip_file}")
+        except OSError as e:
+            print(f"⚠️ 无法删除文件 {zip_file}: {e}")
 
     if all_data:
         df = pd.concat(all_data, ignore_index=True)
@@ -78,11 +88,12 @@ def download_and_merge(symbol, interval, start_date, end_date, output_dir):
         return None
 
 if __name__ == "__main__":
-    coins = ['BTC', 'DOGE', 'SHIB', 'PEPE', 'TRUMP', 'BONK', 'FARTCOIN', 'WIF', 'FLOKI', 'TURBO', 'PNUT', 'NEIRO', 'ORDI', 'BOME', 'HMSTR', 'PEOPLE', 'ELON']
-    interval = "5m"
-    start_date = "2024-12-01"
-    end_date = "2025-05-01"
-    output_dir = "/Users/lizeyu/Downloads/Quant-on-Crypto/data/5m_klines_merged"
+    # coins = ['BTC', 'DOGE', 'SHIB', 'PEPE', 'TRUMP', 'BONK', 'FARTCOIN', 'WIF', 'FLOKI', 'TURBO', 'PNUT', 'NEIRO', 'ORDI', 'BOME', 'HMSTR', 'PEOPLE', 'ELON']
+    coins = ['BTC', 'DOGE', 'SHIB', 'PEPE', 'TRUMP', 'BONK']
+    interval = "1m"
+    start_date = "2025-02-01"
+    end_date = "2025-06-01"
+    output_dir = "/Users/lizeyu/Downloads/Quant-on-Crypto/data/1m_klines_n"
     ensure_directory(output_dir)
 
     for coin in coins:

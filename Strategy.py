@@ -86,9 +86,6 @@ class BaseStrategy(ABC):
             return 0.0
         
             
-        if self.timeline.freeze:
-            return self._force_close_positions(coin, state, signals)
-        
         return self._normal_close_positions(coin, state, signals)
 
     def _force_close_positions(self, coin: str, state: dict, signals: dict) -> float:
@@ -237,13 +234,10 @@ class StatArbitrageStrategy(BaseStrategy):
         self.max_holding_period = trading_params.get('holding_period', 30)      # 最大持仓期
         self.trading_fee = trading_params.get('trading_fee', 0.001)            # 交易费率
         self.bullet = trading_params.get('bullet', 0.02)                       # 仓位系数
-        self.correlation_threshold = trading_params.get('correlation_threshold', 0.7)           # 相关性阈值
-        self.correlation_threshold_u = trading_params.get('correlation_threshold_u', 0.5)           # 相关性阈值
 
         # 2.3 Bollinger Band Parameters
         self.bollinger_window = trading_params.get('bollinger_window', 60)      # 布林带窗口
         self.bollinger_threshold = trading_params.get('bollinger_threshold', 1.5)# 布林带阈值
-        self.freeze_period = trading_params.get('freeze_period', 120)           # 冻结期
 
         # 3. Strategy State Variables
         self.signal_history = defaultdict(lambda: deque(maxlen=self.max_holding_period))  # 信号历史
@@ -273,8 +267,6 @@ class StatArbitrageStrategy(BaseStrategy):
             'global_features': {
                 "correlation": {
                     "window": self.lookback_period,
-                    "threshold_u": self.correlation_threshold_u,
-                    "freeze_period": self.freeze_period
                 }
             }
         }
@@ -346,7 +338,6 @@ class StatArbitrageStrategy(BaseStrategy):
         residual_condition = (self.sigma_threshold * std < abs(residual) < 
                             self.sigma_threshold_u * std)
         return (residual_condition and 
-                not self.timeline.freeze and 
                 std < self.max_std and 
                 state['available_capital'] > 5000)
     

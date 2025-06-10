@@ -322,22 +322,9 @@ class StatArbitrageTimeline(BaseTimeline):
         corr_config = feature_configs['global_features']['correlation']
 
         self.corr_window = corr_config['window']
-        self.corr_threshold_u = corr_config['threshold_u']
-        self.freeze_history = []
         self.correlation_residual = []
         self.correlation_price = []
         self.correlation_residual_deque = deque(maxlen=1440)
-
-        
-        # Add freeze state
-        self.freeze = False
-        self.freeze_countdown = 0   
-        self.freeze_days = 0 
-        self.all_days = 0
-        self.freeze_rate = 0
-        self.btc_prices = deque(maxlen=self.corr_window)
-        self.freeze_period = corr_config['freeze_period']
-        
 
 
         # Initialize feature records dictionary with defaultdict
@@ -527,8 +514,6 @@ class StatArbitrageTimeline(BaseTimeline):
 
             self.correlation_residual.append((self.current_timestamp, self.cor_r))
             self.correlation_residual_deque.append(self.cor_r)
-            # Update freeze state based on price correlation
-            self.update_freeze_state(self.cor_r)
         
 
 
@@ -626,9 +611,6 @@ class StatArbitrageTimeline(BaseTimeline):
             weighted_avg = np.average(correlations, weights=weights)
             self.cor_p = self.std_rate*weighted_avg + (1-self.std_rate)*self.cor_p
             self.correlation_price.append((self.current_timestamp, self.cor_p))
-            
-            # # Update freeze state based on price correlation
-            # self.update_freeze_state(self.cor_p)
 
 
     def _calc_beta_feature(self) -> None:
@@ -747,24 +729,3 @@ class StatArbitrageTimeline(BaseTimeline):
             self.coin_features['position_avg_price']['data'][coin].append(avg_price)
         
 
-
-    def update_freeze_state(self, correlation: float) -> None:
-        """Update market freeze state based on correlation value"""
-        # Check for breakout and update freeze state
-        if correlation > self.corr_threshold_u:
-            self.freeze = True
-            self.freeze_countdown = self.freeze_period
-        elif self.freeze_countdown > 0:
-            self.freeze_countdown -= 1
-            if self.freeze_countdown == 0:
-                self.freeze = False
-                
-        # Update freeze statistics
-        self.all_days += 1
-        if self.freeze:
-            self.freeze_days += 1
-            if self.all_days > 0:
-                self.freeze_rate = self.freeze_days / self.all_days
-                
-        # Record freeze state
-        self.freeze_history.append((self.current_timestamp, self.freeze))
