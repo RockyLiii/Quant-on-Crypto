@@ -1,13 +1,12 @@
 import time
 
-import yaml  # type: ignore
+import yaml
 
-from backtest import analyze_results, run_backtest
-from data_preprocess import preprocess_data
-from logger import get_logger
-from parser_1 import get_args
-from Strategy import StatArbitrageStrategy
-from visualize import (
+from qoc.backtest import analyze_results, run_backtest
+from qoc.preprocess import preprocess_data
+from qoc.strategy import StatArbitrageStrategy
+from qoc.utils import get_args, get_logger
+from qoc.visualize import (
     plot_all_features,
     plot_capital_curve,
     plot_position_curve,

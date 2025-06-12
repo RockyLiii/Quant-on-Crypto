@@ -7,8 +7,8 @@ import pandas as pd
 import scipy.stats
 import torch
 
-from Strategy import BaseStrategy
-from timeline import BaseTimeline, StatArbitrageTimeline
+from qoc.strategy import BaseStrategy
+from qoc.timeline import BaseTimeline, StatArbitrageTimeline
 
 
 def analyze_results(timeline, strategy, config, logger):
