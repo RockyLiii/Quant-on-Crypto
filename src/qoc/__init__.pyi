@@ -1,4 +1,4 @@
-from . import backtest, preprocess, strategy, timeline, utils, visualize
+from . import backtest, preprocess, strategy, struct, timeline, utils, visualize
 from ._version import __version__, __version_tuple__, version, version_tuple
 
 __all__ = [
@@ -7,6 +7,7 @@ __all__ = [
     "backtest",
     "preprocess",
     "strategy",
+    "struct",
     "timeline",
     "utils",
     "version",

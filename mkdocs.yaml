@@ -7,4 +7,9 @@ plugins:
     handlers:
       python:
         inventories:
+          - https://docs.kidger.site/jaxtyping/objects.inv
+          - https://docs.pola.rs/api/python/stable/objects.inv
           - https://docs.python.org/3/objects.inv
+          - https://docs.pytorch.org/docs/stable/objects.inv
+          - https://numpy.org/doc/stable/objects.inv
+          - https://rich.readthedocs.io/en/stable/objects.inv

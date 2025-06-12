@@ -7,15 +7,78 @@ logger = logging.getLogger(__name__)
 
 
 class BaseTimeline:
+    starttime: float
+    """回测开始时间"""
+
+    endtime: float
+    """回测结束时间"""
+
+    current_timestamp: int | None = None
+    """当前时间戳"""
+
+    inittime: int | None = None
+    """初始化时间"""
+
+    initial_capital: float
+    """初始资金"""
+
+    trading_fee: float
+    """交易手续费率"""
+
+    tradeamount: float
+    """总交易金额"""
+
+    coins: list[str]
+    """交易币种列表"""
+
+    data: dict[str, torch.Tensor]
+    """K线数据 [timestamp, open, high, low, close, ...]"""
+
+    positions: dict[str, torch.Tensor]
+    """持仓信息 [timestamp, quantity, avg_price]"""
+
+    trading_records: dict[str, torch.Tensor]
+    """交易记录 [timestamp, price, quantity, fee]"""
+
+    capital: torch.Tensor
+    """资金曲线"""
+
+    total_value: torch.Tensor
+    """总资产曲线"""
+
+    signal_count: dict[str, int]
+    """信号计数 [coin: count]"""
+
+    feature_configs: dict[str, dict[str, dict[str, int]]]
+    """特征配置"""
+
+    coin_features: dict[str, dict[str, deque]]
+    """币种特征数据"""
+
+    global_features: dict[str, dict[str, deque]]
+    """全局特征数据"""
+
+    cor_r: float
+    cor_p: float
+
+    _capital: float
+    """当前可用资金"""
+
+    _total_value: float
+    """当前总资产"""
+
+    _bond: float
+    """空仓保证金"""
+
     def __init__(
         self,
         starttime: float,
         endtime: float,
-        feature_configs: dict[str, dict[str, dict[str, int]]] = None,
+        feature_configs: dict[str, dict[str, dict[str, int]]] | None = None,
         trading_fee: float = 0.001,
         initial_capital: float = 10000,
-    ):
-        """初始化时间轴"""
+    ) -> None:
+        """初始化时间轴."""
         # 1. 基础时间参数
         self.starttime = starttime  # 回测开始时间
         self.endtime = endtime  # 回测结束时间
@@ -80,9 +143,9 @@ class BaseTimeline:
         self.cor_p = 1
 
     def feature_calc(self) -> dict[str, dict[str, torch.Tensor] | torch.Tensor]:
-        """基类特征计算框架
+        """基类特征计算框架.
 
-        返回:
+        Returns:
             Dict: {
                 'coin_features': {
                     feature_name: {coin: tensor},
@@ -94,9 +157,10 @@ class BaseTimeline:
                 }
             }
         """
+        raise NotImplementedError
 
     def _initialize_for_coin(self, coinname: str) -> None:
-        """为新币种初始化数据结构"""
+        """为新币种初始化数据结构."""
         if coinname not in self.coins:
             self.coins.append(coinname)
 
@@ -118,7 +182,7 @@ class BaseTimeline:
                 )
 
     def time_pass(self, new_data: dict[str, torch.Tensor]) -> None:
-        """时间推进，更新数据并计算特征"""
+        """时间推进, 更新数据并计算特征."""
         self.inittime = (
             self.get_current_timestamp()
             if self.inittime is None or self.inittime == 0
@@ -137,7 +201,7 @@ class BaseTimeline:
 
         self.feature_calc()
 
-        # Update recor ds
+        # Update records
         totals = (0.0, 0.0)  # quantity, value
         for coin in self.coins:
             coin_results = self._update_records(coin)
@@ -148,14 +212,14 @@ class BaseTimeline:
         self._update_capital_and_value(totals[1])
 
     def get_current_timestamp(self) -> int:
-        """获取当前时间戳"""
+        """获取当前时间戳."""
         for coin in self.coins:
             if coin in self.data and self.data[coin].size(0) > 0:
                 return int(self.data[coin][-1, 0].item())
         return 0
 
-    def _update_records(self, coin: str) -> tuple[float, float, float, float]:
-        """更新各类记录并返回统计值
+    def _update_records(self, coin: str) -> tuple[float, float]:
+        """更新各类记录并返回统计值.
 
         Returns:
             tuple: (quantity, value)
@@ -184,8 +248,8 @@ class BaseTimeline:
 
         return qty, value
 
-    def _update_total_records(self, totals: tuple[float, float, float, float]) -> None:
-        """更新汇总记录
+    def _update_total_records(self, totals: tuple[float, float]) -> None:
+        """更新汇总记录.
 
         Args:
             totals: (total_quantity, total_value)
@@ -202,7 +266,7 @@ class BaseTimeline:
         )
 
     def _update_capital_and_value(self, total_position_value: float) -> None:
-        """更新可用资金和总资产价值
+        """更新可用资金和总资产价值.
 
         Args:
             total_position_value: 所有持仓的当前市值
@@ -221,7 +285,7 @@ class BaseTimeline:
         self.total_value = torch.cat((self.total_value, value_record), dim=0)
 
     def trade(self, coinname: str, quantity: float) -> None:
-        """执行交易操作，处理开仓、加仓、减仓及手续费"""
+        """执行交易操作, 处理开仓、加仓、减仓及手续费."""
         if coinname not in self.coins:
             return
 

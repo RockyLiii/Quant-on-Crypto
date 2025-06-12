@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import defaultdict, deque
+from typing import override
 
 import numpy as np
 import torch
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class StatArbitrageTimeline(BaseTimeline):
+    @override
     def __init__(
         self,
         starttime: float,
@@ -19,7 +21,7 @@ class StatArbitrageTimeline(BaseTimeline):
         feature_configs: dict[str, dict[str, dict[str, int]]],
         trading_fee: float = 0.001,
         initial_capital: float = 10000,
-    ):
+    ) -> None:
         super().__init__(
             starttime, endtime, feature_configs, trading_fee, initial_capital
         )
@@ -48,8 +50,9 @@ class StatArbitrageTimeline(BaseTimeline):
             "std": defaultdict(lambda: torch.empty((0, 2), dtype=torch.float32)),
         }
 
+    @override
     def feature_calc(self) -> None:
-        """计算所有特征"""
+        """计算所有特征."""
         feature_times = {}
 
         # Price特征计算时间
@@ -111,21 +114,21 @@ class StatArbitrageTimeline(BaseTimeline):
         # Calculate global features
 
     def _record_feature(self, feature_name: str, coin: str, value: float) -> None:
-        """Record feature value with timestamp"""
+        """Record feature value with timestamp."""
         record = torch.tensor([[self.current_timestamp, value]], dtype=torch.float32)
         self.feature_records[feature_name][coin] = torch.cat(
             (self.feature_records[feature_name][coin], record), dim=0
         )
 
     def _calc_price_feature(self) -> None:
-        """计算价格特征"""
+        """计算价格特征."""
         for coin in self.coins:
             current_price = self.data[coin][-1, 4]
             self.coin_features["price"]["data"][coin].append(current_price)
             self._record_feature("price", coin, current_price)
 
     def _calc_correlation_residual(self) -> None:
-        """Calculate correlations between residuals"""
+        """Calculate correlations between residuals."""
         # Skip if insufficient coins
         if len(self.coins) < 2:
             return
@@ -224,7 +227,7 @@ class StatArbitrageTimeline(BaseTimeline):
             self.correlation_residual_deque.append(self.cor_r)
 
     def _calc_correlation_price(self) -> None:
-        """Calculate correlations between price returns using sliding window"""
+        """Calculate correlations between price returns using sliding window."""
         # Skip if insufficient coins
         if len(self.coins) < 2:
             return
@@ -322,7 +325,7 @@ class StatArbitrageTimeline(BaseTimeline):
             self.correlation_price.append((self.current_timestamp, self.cor_p))
 
     def _calc_beta_feature(self) -> None:
-        """使用滑动窗口增量计算优化的beta计算方法"""
+        """使用滑动窗口增量计算优化的beta计算方法."""
         # 初始化存储结构，用于保存每个币种的求和结果
         if not hasattr(self, "_beta_sums"):
             self._beta_sums = {}
@@ -413,7 +416,7 @@ class StatArbitrageTimeline(BaseTimeline):
             self._record_feature("std", coin, new_std)
 
     def _calc_position_feature(self) -> None:
-        """计算持仓量特征"""
+        """计算持仓量特征."""
         for coin in self.coins:
             if self.positions[coin].size(0) == 0:
                 # No positions yet, use default values

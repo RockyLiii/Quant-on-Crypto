@@ -1,5 +1,7 @@
 import time
 
+import rich
+import torch
 import yaml
 
 from qoc.backtest import analyze_results, run_backtest
@@ -30,6 +32,7 @@ class Timer:
 
 
 def main():
+    torch.set_printoptions(threshold=10)
     # 解析命令行参数
     args = get_args()
 
@@ -111,6 +114,8 @@ def main():
                 backtest_params=config,
                 progress_callback=progress_callback,
             )
+            rich.inspect(strategy)
+            rich.inspect(timeline)
 
             logger.info("回测完成")
             # 获取配置中的时间间隔

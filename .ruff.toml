@@ -3,3 +3,6 @@
 
 extend = ".config/linters/.ruff.toml"
 target-version = "py312"
+
+[lint]
+extend-ignore = ["F722"]
