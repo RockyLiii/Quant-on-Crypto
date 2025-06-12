@@ -255,3 +255,5 @@ poetry.toml
 # End of https://www.toptal.com/developers/gitignore/api/data,images,python
 
 _version.py
+.DS_Store
+log.txt
