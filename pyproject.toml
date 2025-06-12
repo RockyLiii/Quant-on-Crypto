@@ -1,0 +1,116 @@
+#:schema https://json.schemastore.org/pyproject.json
+# ref: <https://packaging.python.org/en/latest/specifications/pyproject-toml/>
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatch-vcs", "hatchling"]
+
+[dependency-groups]
+build = ["check-wheel-contents", "hatch", "twine"]
+dev = ["icecream"]
+docs = [
+  "docstring-inheritance",
+  "griffe-fieldz",
+  "griffe-generics",
+  "griffe-inherited-docstrings",
+  "griffe-modernized-annotations",
+  "griffe-pydantic",
+  "griffe-warnings-deprecated",
+  "mdx-truly-sane-lists",
+  "mkdocs",
+  "mkdocs-api-autonav",
+  "mkdocs-autorefs",
+  "mkdocs-git-committers-plugin-2",
+  "mkdocs-git-revision-date-localized-plugin",
+  "mkdocs-include-markdown-plugin",
+  "mkdocs-material[imaging]",
+  "mkdocs-section-index",
+  "mkdocstrings",
+  "mkdocstrings-python",
+  "pymdown-extensions",
+  "ruff",
+]
+test = [
+  "pytest",
+  "pytest-benchmark",
+  "pytest-codspeed",
+  "pytest-cov",
+  "pytest-xdist",
+]
+
+[project]
+authors = [
+  { email = "93507477+RockyLiii@users.noreply.github.com", name = "RockyLiii" },
+]
+classifiers = [
+  # ref: <https://pypi.org/classifiers/>
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python",
+  "Topic :: Office/Business :: Financial :: Investment",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Office/Business",
+  "Typing :: Typed",
+]
+dependencies = [
+  "lazy-loader>=0.4,<0.5",
+  "liblaf-grapes>=0.2.2,<3",
+  "loguru",
+  "matplotlib>=3.10.3,<3.11",
+  "numpy",
+  "pandas>=2.3.0,<3",
+  "polars>=1.30.0,<2",
+  "pyyaml",
+  "requests>=2.32.4,<3",
+  "scikit-learn>=1.7.0,<2",
+  "scipy",
+  "torch>=2.7.1,<3",
+  "tqdm>=4.67.1,<5",
+]
+description = "Add your description here"
+dynamic = ["version"]
+keywords = []
+name = "quant-on-crypto"
+readme = "README.md"
+requires-python = ">=3.12"
+
+[project.urls]
+"Changelog" = "https://github.com/liblaf/Quant-on-Crypto/blob/main/CHANGELOG.md"
+"Documentation" = "https://liblaf.github.io/Quant-on-Crypto/"
+"Funding" = "https://github.com/liblaf/Quant-on-Crypto?sponsor=1"
+"Homepage" = "https://github.com/liblaf/Quant-on-Crypto"
+"Issue Tracker" = "https://github.com/liblaf/Quant-on-Crypto/issues"
+"Release Notes" = "https://github.com/liblaf/Quant-on-Crypto/releases"
+"Source Code" = "https://github.com/liblaf/Quant-on-Crypto"
+
+[tool.check-wheel-contents]
+ignore = ["W002"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/"]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/qoc/_version.py"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qoc/"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.pytest]
+
+[tool.pytest.ini_options]
+addopts = ["--showlocals", "--strict-config", "--strict-markers"]
+testpaths = ["benches/", "tests/"]
+
+[tool.uv]
+default-groups = "all"

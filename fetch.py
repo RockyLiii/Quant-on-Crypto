@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-"""
-批量下载多个币种的 5分钟 K线数据（来自 Binance ZIP 文件），并合并保存为 CSV
-"""
+"""批量下载多个币种的 5分钟 K线数据（来自 Binance ZIP 文件），并合并保存为 CSV"""
 
 import os
-import requests
-from datetime import datetime, timedelta
 import zipfile
+from datetime import datetime, timedelta
+
 import pandas as pd
+import requests
 from tqdm import tqdm
+
 
 def ensure_directory(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
+
 
 def download_zip_monthly(symbol, interval, year, month, output_dir):
     filename = f"{symbol}-{interval}-{year}-{month:02d}.zip"
@@ -22,14 +23,15 @@ def download_zip_monthly(symbol, interval, year, month, output_dir):
     if os.path.exists(local_path):
         print(f"✅ 文件已存在，跳过: {filename}")
         return True
-    
+
     try:
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        total = int(response.headers.get('content-length', 0))
-        with open(local_path, "wb") as f, tqdm(
-            desc=filename, total=total, unit='B', unit_scale=True
-        ) as bar:
+        total = int(response.headers.get("content-length", 0))
+        with (
+            open(local_path, "wb") as f,
+            tqdm(desc=filename, total=total, unit="B", unit_scale=True) as bar,
+        ):
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
                 bar.update(len(chunk))
@@ -39,8 +41,9 @@ def download_zip_monthly(symbol, interval, year, month, output_dir):
         print(f"❌ 下载失败: {filename} - {e}")
         return False
 
+
 def extract_and_read_csv(zip_path, output_dir):
-    with zipfile.ZipFile(zip_path, 'r') as zf:
+    with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(output_dir)
         all_dfs = []
         for name in zf.namelist():
@@ -49,6 +52,7 @@ def extract_and_read_csv(zip_path, output_dir):
             all_dfs.append(df)
             os.remove(csv_path)  # 删除临时文件
         return all_dfs
+
 
 def download_and_merge(symbol, interval, start_date, end_date, output_dir):
     all_data = []
@@ -60,7 +64,9 @@ def download_and_merge(symbol, interval, start_date, end_date, output_dir):
         year, month = current_dt.year, current_dt.month
         success = download_zip_monthly(symbol, interval, year, month, output_dir)
         if success:
-            zip_file = os.path.join(output_dir, f"{symbol}-{interval}-{year}-{month:02d}.zip")
+            zip_file = os.path.join(
+                output_dir, f"{symbol}-{interval}-{year}-{month:02d}.zip"
+            )
             zip_files.append(zip_file)  # Add to cleanup list
             dfs = extract_and_read_csv(zip_file, output_dir)
             all_data.extend(dfs)
@@ -78,18 +84,27 @@ def download_and_merge(symbol, interval, start_date, end_date, output_dir):
     if all_data:
         df = pd.concat(all_data, ignore_index=True)
         df.columns = [
-            "Open Time", "Open", "High", "Low", "Close", "Volume",
-            "Close Time", "Quote Asset Volume", "Number of Trades",
-            "Taker Buy Base Volume", "Taker Buy Quote Volume", "Ignore"
+            "Open Time",
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume",
+            "Close Time",
+            "Quote Asset Volume",
+            "Number of Trades",
+            "Taker Buy Base Volume",
+            "Taker Buy Quote Volume",
+            "Ignore",
         ]
         return df
-    else:
-        print(f"⚠️ {symbol} 没有数据可用")
-        return None
+    print(f"⚠️ {symbol} 没有数据可用")
+    return None
+
 
 if __name__ == "__main__":
     # coins = ['BTC', 'DOGE', 'SHIB', 'PEPE', 'TRUMP', 'BONK', 'FARTCOIN', 'WIF', 'FLOKI', 'TURBO', 'PNUT', 'NEIRO', 'ORDI', 'BOME', 'HMSTR', 'PEOPLE', 'ELON']
-    coins = ['BTC', 'DOGE', 'SHIB', 'PEPE', 'TRUMP', 'BONK']
+    coins = ["BTC", "DOGE", "SHIB", "PEPE", "TRUMP", "BONK"]
     interval = "1m"
     start_date = "2025-02-01"
     end_date = "2025-06-01"
