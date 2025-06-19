@@ -9,6 +9,8 @@ import polars as pl
 import torch
 from jaxtyping import UInt64
 
+from .typed import Timestamp
+
 
 class TimeUnit(enum.StrEnum):
     MINUTE = "min"
@@ -31,11 +33,8 @@ _TIME_UNIT_SECONDS: dict[TimeUnit, float] = {
 }
 
 
-type Timestamp = int
-
-
 @attrs.frozen
-class Timeline(Sequence[Timestamp]):
+class TimeIndex(Sequence[Timestamp]):
     unit: TimeUnit = TimeUnit.SECOND
     _timestamp: list[Timestamp] = attrs.field(factory=list, init=False)
 
@@ -58,9 +57,9 @@ class Timeline(Sequence[Timestamp]):
         """Get the latest timestamp in the timeline.
 
         Returns:
-            The most recent timestamp in the timeline, or 0 if the timeline is empty.
+            The most recent timestamp in the timeline, or -1 if the timeline is empty.
         """
-        return self._timestamp[-1] if self._timestamp else 0
+        return self._timestamp[-1] if self._timestamp else -1
 
     def append(self, timestamp: Timestamp) -> None:
         """Append a new timestamp to the timeline.
@@ -88,7 +87,7 @@ class Timeline(Sequence[Timestamp]):
         return np.asarray(self._timestamp, dtype=np.uint64)
 
     def to_pandas(self) -> pd.DataFrame:
-        raise NotImplementedError  # TODO: implement @liblaf
+        raise NotImplementedError  # TODO(liblaf)
 
     def to_polars(self) -> pl.DataFrame:
         """Convert the timeline to a polars.DataFrame.
