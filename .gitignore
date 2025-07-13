@@ -256,5 +256,6 @@ poetry.toml
 
 _version.py
 .DS_Store
+data/
 log.txt
 playground/
