@@ -2,7 +2,7 @@ import datetime
 import enum
 import itertools
 import time
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from typing import Literal
 
 from liblaf import grapes
