@@ -14,7 +14,7 @@ import qoc
 
 class Config(pydantic.BaseModel):
     db: str = qoc.data_dir("database").as_uri().replace("file://", "lmdb://")
-    max_iter: int | None = None
+    max_duration: datetime.timedelta | None = datetime.timedelta(hours=1)
 
     # strategy config
     symbol: str = "PENGUUSDT"
@@ -78,7 +78,9 @@ def main(cfg: Config) -> None:
 
     logger.debug(api.exchange_info(symbol=cfg.symbol))
 
-    for now in qoc.clock(interval=datetime.timedelta(seconds=1), max_iter=cfg.max_iter):
+    for now in qoc.clock(
+        interval=datetime.timedelta(seconds=1), max_duration=cfg.max_duration
+    ):
         market.step(api=api)
         strategy.step(api=api, market=market, now=now)
         strategy.dump(now=now)

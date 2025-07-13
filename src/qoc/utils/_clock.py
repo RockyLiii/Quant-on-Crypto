@@ -32,12 +32,15 @@ def clock(
     interval: datetime.timedelta = datetime.timedelta(seconds=1),
     *,
     align: AlignLike = Align.UNALIGNED,
+    max_duration: datetime.timedelta | None = None,
     max_iter: int | None = None,
 ) -> Generator[datetime.datetime]:
     align = Align(align)
     now: datetime.datetime = datetime.datetime.now(tz=datetime.UTC)
     next_time: datetime.datetime = align.ceil(now + interval)
-    for next_time in _ticks(interval, align=align, max_iter=max_iter):
+    for next_time in _ticks(
+        interval, align=align, max_duration=max_duration, max_iter=max_iter
+    ):
         now = datetime.datetime.now(tz=datetime.UTC)
         total_seconds: float = (next_time - now).total_seconds()
         if total_seconds < 0:
@@ -56,12 +59,16 @@ def _ticks(
     interval: datetime.timedelta = datetime.timedelta(seconds=1),
     *,
     align: AlignLike = Align.UNALIGNED,
+    max_duration: datetime.timedelta | None = None,
     max_iter: int | None = None,
 ) -> Generator[datetime.datetime]:
     align = Align(align)
-    loop: Iterable = range(max_iter) if max_iter is not None else itertools.count()
-    now: datetime.datetime = datetime.datetime.now(tz=datetime.UTC)
-    next_time: datetime.datetime = align.ceil(now + interval)
-    for _ in loop:
-        yield next_time
-        next_time += interval
+    start: datetime.datetime = datetime.datetime.now(tz=datetime.UTC)
+    now: datetime.datetime = align.ceil(start + interval)
+    for it in itertools.count():
+        if max_iter is not None and it >= max_iter:
+            break
+        if max_duration is not None and (now - start) > max_duration:
+            break
+        yield now
+        now += interval
