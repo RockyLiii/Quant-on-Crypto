@@ -8,61 +8,73 @@ name: MegaLinter
 
 on:
   push:
-    branches-ignore:
-      - assets**
-      - gh-pages
   pull_request:
   workflow_dispatch:
 
 jobs:
-  delete-cancelled-runs:
-    name: Delete Cancelled Runs
+  skip-duplicate:
+    name: Skip Duplicate
     permissions:
       actions: write
-    runs-on: "ubuntu-latest"
+    runs-on: ubuntu-latest
+    outputs:
+      should-skip: ${{ steps.skip-duplicate.outputs.should-skip }}
     steps:
-      - id: workflow
-        name: Get Workflow File
-        run: |-
-          file="${GITHUB_WORKFLOW_REF%@*}"
-          file="$(basename -- "$file")"
-          printf "file=%q\n" "$file" >> "$GITHUB_OUTPUT"
-      - uses: MercuryTechnologies/delete-cancelled-runs@1.0.0
+      - id: skip-duplicate
+        name: Skip Duplicate
+        uses: liblaf/actions/skip-duplicate@dist
         with:
-          workflow-file: ${{ steps.workflow.outputs.file }}
-          github-token: ${{ github.token }}
+          cancel-others: true
 
   mega-linter:
     name: MegaLinter
     permissions:
-      contents: write # commit fix
-      issues: write # ref: <https://megalinter.io/latest/reporters/GitHubCommentReporter/>
-      pull-requests: write # ref: <https://megalinter.io/latest/reporters/GitHubCommentReporter/>
+      contents: write
+      issues: write
+      pull-requests: write
+    needs:
+      - skip-duplicate
+    if: needs.skip-duplicate.outputs.should-skip != 'true'
     runs-on: ubuntu-latest
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-mega-linter
-      cancel-in-progress: true
     steps:
-      - id: auth
-        name: Auth App
-        uses: liblaf/actions/auth-app@main
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.head_ref || github.ref }}
-          token: ${{ steps.auth.outputs.token }}
-      - name: MegaLinter
-        uses: liblaf/actions/mega-linter@main
+      - id: lint
+        name: MegaLinter
+        uses: liblaf/actions/mega-linter@dist
+      - if: success() || failure()
+        name: Upload Reports
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ steps.auth.outputs.token }}
-      - name: Remove MegaLinter Reports
-        run: sudo rm --force --recursive "mega-linter.log" "megalinter-reports/"
-      - name: Commit
-        uses: liblaf/actions/commit@main
+          name: mega-linter-reports
+          path: |-
+            mega-linter.log
+            megalinter-reports
+          include-hidden-files: true
+      - if: success() || failure()
+        name: Remove MegaLinter Reports
+        run: |-
+          cp --target-directory='${{ runner.temp }}' --verbose 'megalinter-reports/megalinter-report.md'
+          sudo rm --force --recursive 'mega-linter.log' 'megalinter-reports'
+      - if: steps.lint.outputs.has-updated-sources > 0 && github.ref == 'refs/heads/main'
+        name: Create PR with Applied Fixes
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore(mega-linter): apply linters automatic fixes"
+          branch: mega-linter-fix/${{ github.ref_name }}
+          sign-commits: true
+          title: "chore(mega-linter): apply linters automatic fixes"
+          body-path: ${{ runner.temp }}/megalinter-report.md
+          labels: |-
+            autofix
+            automerge
+          assignees: ${{ github.repository_owner }}
+          reviewers: ${{ github.repository_owner }}
+      - if: steps.lint.outputs.has-updated-sources > 0 && github.ref != 'refs/heads/main'
+        name: Commit and Push Applied Linter Fixes
+        uses: liblaf/actions/commit@dist
         with:
           add-options: --verbose --update
-          message: "chore(mega-linter): apply linter fixes"
-          token: ${{ steps.auth.outputs.token }}
+          message: "chore(mega-linter): apply linters automatic fixes"

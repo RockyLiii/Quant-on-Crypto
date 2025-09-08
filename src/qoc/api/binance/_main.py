@@ -7,12 +7,18 @@ import polars as pl
 from environs import env
 from loguru import logger
 
-from ._account import Account
-from ._enum import OrderSide, OrderSideLike, OrderType, OrderTypeLike
+from qoc.api.typing import (
+    Account,
+    Interval,
+    OrderResponseFull,
+    OrderSide,
+    OrderSideLike,
+    OrderType,
+    OrderTypeLike,
+)
+
 from ._exchange_info import ExchangeInfo
-from ._market_data import Interval
-from ._trading import OrderResponseFull
-from ._typed import TimeUnit
+from ._typing import TimeUnit
 
 
 @attrs.define
@@ -137,13 +143,13 @@ class ApiBinance:
         side: OrderSideLike,
         *,
         quantity: float | None = None,
-        quote_order_qty: float | None = None,
+        quoteOrderQty: float | None = None,
         **kwargs,
     ) -> OrderResponseFull:
         if quantity is not None:
             kwargs["quantity"] = f"{quantity:f}"
-        if quote_order_qty is not None:
-            kwargs["quoteOrderQty"] = f"{quote_order_qty:f}"
+        if quoteOrderQty is not None:
+            kwargs["quoteOrderQty"] = f"{quoteOrderQty:f}"
         return self.order(symbol, side, OrderType.MARKET, **kwargs)
 
     # endregion Trading

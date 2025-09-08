@@ -1,15 +1,4 @@
-from . import (
-    api,
-    backtest,
-    balance,
-    market,
-    preprocess,
-    strategy,
-    struct,
-    timeline,
-    utils,
-    visualize,
-)
+from . import api, backtest, balance, feature, market, struct, timeline, utils
 from ._version import __version__, __version_tuple__, version, version_tuple
 from .api import ApiBinance, Interval
 from .balance import Balance
@@ -46,16 +35,14 @@ __all__ = [
     "clock",
     "data_dir",
     "entrypoint",
+    "feature",
     "fig_dir",
     "insert_time",
     "market",
-    "preprocess",
-    "strategy",
     "struct",
     "timeline",
     "utils",
     "version",
     "version_tuple",
-    "visualize",
     "working_dir",
 ]

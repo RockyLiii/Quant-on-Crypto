@@ -1,7 +1,8 @@
 from typing import cast
 
+from qoc.api.typing import BaseModel
+
 from ._filters import Filter, FilterType, FilterTypeLike, LotSize, MinNotional, Notional
-from ._utils import BaseModel
 
 
 class ExchangeInfoSymbol(BaseModel):

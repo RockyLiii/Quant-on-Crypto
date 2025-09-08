@@ -3,23 +3,21 @@ import math
 from typing import override
 
 import attrs
-import loguru
 import pydantic
-from environs import env
-from liblaf import grapes
+from liblaf import cherries, grapes
 from loguru import logger
 
 import qoc
 
 
-class Config(pydantic.BaseModel):
+class Config(cherries.BaseConfig):
     db: str = qoc.data_dir("database").as_uri().replace("file://", "lmdb://")
     max_duration: datetime.timedelta | None = datetime.timedelta(hours=1)
 
     # strategy config
-    symbol: str = "PENGUUSDT"
-    quantity: float = 50.0
-    ratio: float = 0.001
+    symbol: str = "BTCUSDT"
+    quantity: float = 1e-4
+    ratio: float = 0.0
 
 
 @attrs.define
@@ -52,14 +50,18 @@ class StrategyGrid(qoc.StrategySingleSymbol):
             self.base_price = price
             logger.debug("Initialize base price: {}", self.base_price)
             return
+        logger.info("close: {}", price)
         if price < self.price_lower:
-            api.order_market(self.symbol, qoc.api.OrderSide.BUY, quantity=self.quantity)
+            resp = api.order_market(
+                self.symbol, qoc.api.OrderSide.BUY, quantity=self.quantity
+            )
             logger.debug("BUY > {}: {}", self.symbol, price)
             self.base_price = price
         elif price > self.price_upper:
-            api.order_market(
+            resp = api.order_market(
                 self.symbol, qoc.api.OrderSide.SELL, quantity=self.quantity
             )
+            logger.info("close: {}; price: {}", price, resp.price)
             logger.debug("SELL > {}: {}", self.symbol, price)
             self.base_price = price
 
@@ -67,7 +69,9 @@ class StrategyGrid(qoc.StrategySingleSymbol):
 def main(cfg: Config) -> None:
     api: qoc.ApiBinance = qoc.ApiBinance.create()
     db = qoc.Database(uri=cfg.db)
-    market = qoc.Market(library=db.get_library("market"), symbols=[cfg.symbol])
+    market = qoc.Market(
+        library=db.get_library("market"), symbols=[cfg.symbol], interval="1s"
+    )
     balance = qoc.Balance(library=db.get_library("balance"), symbols=[cfg.symbol])
     strategy = StrategyGrid(
         library=db.get_library("strategy"),
@@ -81,23 +85,11 @@ def main(cfg: Config) -> None:
     for now in qoc.clock(
         interval=datetime.timedelta(seconds=1), max_duration=cfg.max_duration
     ):
-        market.step(api=api)
+        market.step(api=api)  # get klines
         strategy.step(api=api, market=market, now=now)
         strategy.dump(now=now)
         balance.step(api=api, market=market, now=now)
 
 
 if __name__ == "__main__":
-    LOGGING_FILTER: "loguru.FilterDict" = {"qoc": "DEBUG"}
-    grapes.init_logging(
-        handlers=[
-            grapes.logging.rich_handler(filter=LOGGING_FILTER),
-            grapes.logging.file_handler(
-                sink=qoc.working_dir() / "run.log", filter=LOGGING_FILTER
-            ),
-        ],
-        filter=LOGGING_FILTER,
-    )
-    env.read_env()
-    config = Config()
-    main(config)
+    cherries.run(main, profile="playground")

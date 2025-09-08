@@ -4,8 +4,7 @@ from typing import Annotated, Literal
 import pydantic
 
 from qoc import utils
-
-from ._utils import BaseModel
+from qoc.api.typing import BaseModel
 
 
 class FilterType(utils.CaseInsensitiveEnum):

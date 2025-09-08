@@ -259,3 +259,4 @@ _version.py
 data/
 log.txt
 playground/
+.cherries/

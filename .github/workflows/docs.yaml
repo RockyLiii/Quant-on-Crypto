@@ -2,45 +2,57 @@
 # DO NOT EDIT!
 
 name: Docs
+
 on:
   push:
-    branches-ignore:
-      - assets**
-      - gh-pages
+  pull_request:
   workflow_dispatch:
 
 jobs:
+  skip-duplicate:
+    name: Skip Duplicate
+    permissions:
+      actions: write
+    runs-on: ubuntu-latest
+    outputs:
+      should-skip: ${{ steps.skip-duplicate.outputs.should-skip }}
+    steps:
+      - id: skip-duplicate
+        name: Skip Duplicate
+        uses: liblaf/actions/skip-duplicate@dist
+        with:
+          cancel-others: true
+
   docs:
     name: Docs
     permissions:
       contents: write
       pages: write
+    needs:
+      - skip-duplicate
+    if: needs.skip-duplicate.outputs.should-skip != 'true'
     runs-on: ubuntu-latest
-    concurrency:
-      group: docs
     steps:
-      - id: auth
-        name: Auth App
-        uses: liblaf/actions/auth-app@main
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          token: ${{ steps.auth.outputs.token }}
           fetch-depth: 0
       - name: Setup Python
-        uses: liblaf/actions/setup-python@main
+        uses: liblaf/actions/setup-python@dist
       - if: hashFiles('docs/scripts/pre-build.sh') != ''
         name: Pre-Build
         run: docs/scripts/pre-build.sh
-      - if: ${{ github.ref != 'refs/heads/main' }}
-        name: Build
+      - name: Build
         run: mkdocs build
       - if: ${{ github.ref == 'refs/heads/main' }}
         name: Deploy
-        run: mkdocs gh-deploy --force --no-history
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: site
+          single-commit: true
       - if: ${{ github.ref == 'refs/heads/main' }}
         name: Setup GitHub Pages
-        uses: liblaf/actions/setup-pages@main
+        uses: liblaf/actions/setup-pages@dist
         with:
-          token: ${{ secrets.GH_PAT || steps.auth.outputs.token }}
+          token: ${{ github.token }}
         continue-on-error: true

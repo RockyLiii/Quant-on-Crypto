@@ -23,6 +23,7 @@ class Market:
     def step(self, api: api.ApiBinance) -> None:
         for symbol in self.symbols:
             klines: pl.DataFrame = api.klines(symbol, self.interval)
+            ic(klines)
             self.library.append(symbol, klines)
 
     def tail(
