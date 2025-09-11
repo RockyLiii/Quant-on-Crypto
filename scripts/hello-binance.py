@@ -91,7 +91,7 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    grapes.init_logging(filter={"qoc": "DEBUG"})
+    # grapes.init_logging(filter={"qoc": "DEBUG"})
     env.read_env()
     config = Config()
     main(config)
