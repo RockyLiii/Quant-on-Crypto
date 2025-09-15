@@ -6,8 +6,9 @@ from .database import Database, Library
 from .market import Market
 from .strategy import Strategy, StrategySingleSymbol
 from .utils import (
-    Align,
     CaseInsensitiveEnum,
+    Snap,
+    SnapLike,
     clock,
     data_dir,
     entrypoint,
@@ -17,7 +18,6 @@ from .utils import (
 )
 
 __all__ = [
-    "Align",
     "ApiBinance",
     "Balance",
     "CaseInsensitiveEnum",
@@ -25,6 +25,8 @@ __all__ = [
     "Interval",
     "Library",
     "Market",
+    "Snap",
+    "SnapLike",
     "Strategy",
     "StrategySingleSymbol",
     "__version__",

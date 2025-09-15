@@ -12,7 +12,6 @@ class Market:
     library: database.Library = attrs.field()
     symbols: list[str] = attrs.field(factory=lambda: ["BTCUSDT"])
     interval: api.Interval = attrs.field(default="1s")
-    
 
     def convert(self, qty: float, base: str, quote: str) -> float:
         if base == quote:
@@ -36,7 +35,6 @@ class Market:
             now_kline = df[df.index == now]
 
             self.library.append(symbol, now_kline)
-
 
     def tail(
         self, symbol: str, n: int = 5, columns: Sequence[str] | None = None

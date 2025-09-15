@@ -1,17 +1,18 @@
 import datetime
-from datetime import timedelta, datetime
 import math
+import os
+import sys
+from datetime import datetime, timedelta
 from typing import override
 
-import attrs
-import pydantic
-from liblaf import cherries, grapes
-from loguru import logger
 import arcticdb as adb
+import attrs
+from liblaf import cherries
+from loguru import logger
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
+)
 
 import qoc
 
@@ -25,13 +26,12 @@ class Config(cherries.BaseConfig):
     quantity: float = 1e-4
     ratio: float = 0.001
 
-
-
-    symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]    
+    symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]
     interval: str = "1m"
     start_date: str = "2025-02-01"
     end_date: str = "2025-03-01"
     output_dir: str = "/Users/lizeyu/Desktop/qoc/tmp/raw/1m_klines_raw"
+
 
 @attrs.define
 class StrategyGrid(qoc.StrategySingleSymbol):
@@ -40,7 +40,9 @@ class StrategyGrid(qoc.StrategySingleSymbol):
     ratio: float = attrs.field(default=0.001, metadata={"dump": False})
 
     # State - 使用字典按symbol分组
-    base_prices: dict[str, float | None] = attrs.field(factory=dict, metadata={"dump": True})
+    base_prices: dict[str, float | None] = attrs.field(
+        factory=dict, metadata={"dump": True}
+    )
 
     def get_base_price(self, symbol: str) -> float | None:
         return self.base_prices.get(symbol)
@@ -65,19 +67,19 @@ class StrategyGrid(qoc.StrategySingleSymbol):
         if not self.symbols:
             return None
         return self.get_base_price(self.symbols[0])
-    
+
     @base_price.setter
     def base_price(self, value: float | None) -> None:
         if not self.symbols:
             return
         self.set_base_price(self.symbols[0], value)
-    
+
     @property
     def price_upper(self) -> float:
         if not self.symbols:
             return -math.inf
         return self.get_price_upper(self.symbols[0])
-    
+
     @property
     def price_lower(self) -> float:
         if not self.symbols:
@@ -85,20 +87,23 @@ class StrategyGrid(qoc.StrategySingleSymbol):
         return self.get_price_lower(self.symbols[0])
 
     @override
-    def step(
-        self, api: qoc.ApiBinance, market: qoc.Market, now: datetime
-    ) -> None:
+    def step(self, api: qoc.ApiBinance, market: qoc.Market, now: datetime) -> None:
         for symbol in self.symbols:
             price: float = market.tail(symbol, n=1)["close"].iloc[-1]
             if self.get_base_price(symbol) is None:
                 self.set_base_price(symbol, price)
                 logger.debug("Initialize base price for {}: {}", symbol, price)
                 continue
-                
-            logger.info("{} - Price: {}, Base price: {}, Lower bound: {}, Upper bound: {}", 
-                      symbol, price, self.get_base_price(symbol), 
-                      self.get_price_lower(symbol), self.get_price_upper(symbol))
-                
+
+            logger.info(
+                "{} - Price: {}, Base price: {}, Lower bound: {}, Upper bound: {}",
+                symbol,
+                price,
+                self.get_base_price(symbol),
+                self.get_price_lower(symbol),
+                self.get_price_upper(symbol),
+            )
+
             if price < self.get_price_lower(symbol):
                 resp = api.order_market(
                     symbol, qoc.api.OrderSide.BUY, quantity=self.quantity
@@ -112,21 +117,24 @@ class StrategyGrid(qoc.StrategySingleSymbol):
                 logger.info("{} - close: {}; price: {}", symbol, price, resp.price)
                 logger.debug("SELL > {}: {}", symbol, price)
                 self.set_base_price(symbol, price)
-    
-    def step_offline(
-        self, market, library, coins, interval, now
-    ) -> None:
+
+    def step_offline(self, market, library, coins, interval, now) -> None:
         for symbol in self.symbols:
             price: float = market.tail(symbol, n=1)["Close"].iloc[-1]
             if self.get_base_price(symbol) is None:
                 self.set_base_price(symbol, price)
                 logger.debug("Initialize base price for {}: {}", symbol, price)
                 continue
-                
-            logger.info("{} - Price: {}, Base price: {}, Lower bound: {}, Upper bound: {}", 
-                      symbol, price, self.get_base_price(symbol), 
-                      self.get_price_lower(symbol), self.get_price_upper(symbol))
-                
+
+            logger.info(
+                "{} - Price: {}, Base price: {}, Lower bound: {}, Upper bound: {}",
+                symbol,
+                price,
+                self.get_base_price(symbol),
+                self.get_price_lower(symbol),
+                self.get_price_upper(symbol),
+            )
+
             if price < self.get_price_lower(symbol):
                 logger.debug("BUY > {}: {}", symbol, price)
                 self.set_base_price(symbol, price)
@@ -157,24 +165,37 @@ def main(cfg: Config) -> None:
         for now in qoc.clock(
             interval=timedelta(seconds=1), max_duration=cfg.max_duration
         ):
-
             market.step(api=api)  # get klines
             strategy.step(api=api, market=market, now=now)
             strategy.dump(now=now)
             balance.step(api=api, market=market, now=now)
     else:
         from offline_fetch import fetch_for_offline
+
         uri = "lmdb://examples/grid-strategy/data/database_offline/"
         ac = adb.Arctic(uri)
 
-        library = ac.get_library('market', create_if_missing=True)
-        timestamps = fetch_for_offline(cfg.symbols, cfg.interval, cfg.start_date, cfg.end_date, cfg.output_dir, library)
-        
+        library = ac.get_library("market", create_if_missing=True)
+        timestamps = fetch_for_offline(
+            cfg.symbols,
+            cfg.interval,
+            cfg.start_date,
+            cfg.end_date,
+            cfg.output_dir,
+            library,
+        )
+
         for ts in timestamps:
-
-
-            market.step_offline(library=library, coins=cfg.symbols, interval=cfg.interval, now=ts)  # get klines from local db
-            strategy.step_offline(library=library, market=market, coins=cfg.symbols, interval=cfg.interval, now=ts)
+            market.step_offline(
+                library=library, coins=cfg.symbols, interval=cfg.interval, now=ts
+            )  # get klines from local db
+            strategy.step_offline(
+                library=library,
+                market=market,
+                coins=cfg.symbols,
+                interval=cfg.interval,
+                now=ts,
+            )
             # strategy.dump(now=now)
             # balance.step_offline(library=library, market=market, coins=cfg.symbols, interval=cfg.interval, now=ts)
 

@@ -25,14 +25,14 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "arcticdb>=5,<6",
+  "arcticdb>=6,<7",
   "binance-connector>=3,<4",
   "jaxtyping>=0.3,<0.4",
   "lazy-loader>=0.4,<0.5",
   "liblaf-cherries>=0.4.1",
   "liblaf-grapes>=2,<3",
   "loguru>=0.7,<0.8",
-  "matplotlib>=3.0.0,<4",
+  "matplotlib>=3,<4",
   "numpy>=2,<3",
   "pandas>=2,<3",
   "polars[pyarrow]>=1,<2",
@@ -85,22 +85,20 @@ packages = ["src/qoc"]
 source = "vcs"
 
 [tool.pyright]
-exclude = ["**/.*", "**/__pycache__", "**/marimo", "**/node_modules"]
 extends = ".config/linters/pyrightconfig.json"
 
 [tool.pytest.ini_options]
 addopts = [
   "--doctest-modules",
   "--hypothesis-show-statistics",
+  "--import-mode=importlib",
   "--showlocals",
   "--strict-config",
   "--strict-markers",
-  "--suppress-no-test-exit-code",
 ]
 testpaths = ["benches", "src", "tests"]
 
 [tool.ruff]
-exclude = ["**/marimo/"]
 extend = ".config/linters/.ruff.toml"
 
 [tool.ruff.lint]

@@ -38,17 +38,18 @@ class Strategy(abc.ABC):
 #         data = data.insert_column(0, pl.Series("time", [now]))
 #         self.library.append(self.symbol, data)
 
-#     def _dump_filter(self, attr: attrs.Attribute, value: Any) -> bool:  # noqa: ARG002
+
+#     def _dump_filter(self, attr: attrs.Attribute, value: Any) -> bool:
 #         return attr.metadata.get("dump", True)
 @attrs.define
 class StrategySingleSymbol(Strategy):
     symbols: list[str] = attrs.field(factory=list, metadata={"dump": False})
-    
+
     # For backward compatibility - default to first symbol in list
     @property
     def symbol(self) -> str:
         return self.symbols[0] if self.symbols else ""
-    
+
     @abc.abstractmethod
     def step(
         self, api: api.ApiBinance, market: market.Market, now: datetime.datetime
@@ -60,7 +61,7 @@ class StrategySingleSymbol(Strategy):
             [attrs.asdict(self, filter=self._dump_filter)]
         )
         data = data.insert_column(0, pl.Series("time", [now]))
-        
+
         # Dump data for each symbol
         for symbol in self.symbols:
             self.library.append(symbol, data)

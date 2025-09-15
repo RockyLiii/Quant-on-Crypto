@@ -1,15 +1,16 @@
 import datetime
 import math
+import os
+import sys
 from typing import override
 
 import attrs
-import pydantic
-from liblaf import cherries, grapes
+from liblaf import cherries
 from loguru import logger
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
+)
 
 import qoc
 
