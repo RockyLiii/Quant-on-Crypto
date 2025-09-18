@@ -10,20 +10,20 @@ class OrderResponseFill(BaseModel):
     price: float
     qty: float
     commission: float
-    commission_asset: str
-    trade_id: int
+    commissionasset: str
+    tradeid: int
 
 
 class OrderResponseFull(BaseModel):
     symbol: str
-    client_order_id: str
-    transact_time: datetime.datetime
+    clientorderid: str
+    transacttime: datetime.datetime
     price: float
-    orig_qty: float
-    executed_qty: float
-    orig_quote_order_qty: float
-    cummulative_quote_qty: float
-    type_: OrderType = pydantic.Field(alias="type")
+    origqty: float
+    executedqty: float
+    origquoteorderqty: float
+    cummulativequoteqty: float
+    type: OrderType = pydantic.Field(alias="type")
     side: OrderSide
-    working_time: datetime.datetime
+    workingtime: datetime.datetime
     fills: list[OrderResponseFill]

@@ -58,6 +58,9 @@ class ApiBinance:
     def ping(self) -> None:
         self.client.ping()
 
+    def step(self) -> bool:
+        return False
+
     def exchange_info(
         self,
         symbol: str | None = None,
@@ -112,6 +115,21 @@ class ApiBinance:
             ],
             orient="row",
         )
+
+
+        # 将 Datetime 时间戳转换为整数微秒时间戳
+        time_unit_multiplier = {
+            "ns": 0.001,  # 纳秒转微秒需要除以 1000
+            "us": 1,      # 微秒保持不变
+            "ms": 1000,   # 毫秒转微秒需要乘以 1000
+            "s": 1000000, # 秒转微秒需要乘以 1000000
+        }[self.timeunit.to_polars]
+
+        # 转换时间列为整数微秒时间戳
+        data = data.with_columns([
+            pl.col("open_time").dt.epoch("us").alias("open_time"),
+            pl.col("close_time").dt.epoch("us").alias("close_time")
+        ])
         return data
 
     # endregion Market Data

@@ -29,7 +29,7 @@ class Config(pydantic.BaseModel):
 @attrs.define
 class StrategyGrid(qoc.StrategySingleSymbol):
     # Config
-    quantity: float = attrs.field(metadata={"dump": False})
+    quantity: float = attrs.field(metadata={"dump": False}) # pyright: ignore[reportGeneralTypeIssues]
     ratio: float = attrs.field(default=0.01, metadata={"dump": False})
 
     # State
@@ -75,7 +75,7 @@ def main(cfg: Config) -> None:
     balance = qoc.Balance(library=db.get_library("balance"), symbols=[cfg.symbol])
     strategy = StrategyGrid(
         library=db.get_library("strategy"),
-        symbol=cfg.symbol,
+        symbol=cfg.symbol, # pyright: ignore[reportCallIssue]
         quantity=cfg.quantity,
         ratio=cfg.ratio,
     )

@@ -41,11 +41,14 @@ class Library:
                 payloads.append(adb.WritePayload(symbol, df_normalized))
         self.library.append_batch(payloads, **kwargs)
 
-    def get_latest_time(self, symbol: str, /) -> datetime.datetime:
+    def get_latest_time(self, symbol: str, /) -> int:
         data: pd.DataFrame = cast(
             "pd.DataFrame", self.library.tail(symbol=symbol, n=1).data
         )
-        return data.index[-1]
+
+        latest_index = data.index[-1] 
+        
+        return latest_index
 
     def has_symbol(self, symbol: str, /) -> bool:
         return self.library.has_symbol(symbol)
@@ -74,7 +77,7 @@ class Library:
     ) -> pd.DataFrame:
         return cast(
             "pd.DataFrame",
-            self.library.tail(symbol=symbol, n=n, columns=columns).data,  # pyright: ignore[reportArgumentType]
+            self.library.tail(symbol=symbol, n=n, columns=columns).data,  
         )
 
     def _normalize_data(self, data: NormalizableType) -> pd.DataFrame:

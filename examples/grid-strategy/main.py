@@ -8,91 +8,162 @@ import attrs
 from liblaf import cherries
 from loguru import logger
 
+
+
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
 )
 
-import qoc
-
+import qoc 
+import qoc.api as api # pyright: ignore
 
 class Config(cherries.BaseConfig):
     db: str = qoc.data_dir("database").as_uri().replace("file://", "lmdb://")
-    max_duration: datetime.timedelta | None = datetime.timedelta(hours=1)
+    # max_duration: datetime.timedelta | None = datetime.timedelta(hours=999999)
 
     # strategy config
-    symbol: str = "BTCUSDT"
+
+    online: bool = False
+    symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]    
     quantity: float = 1e-4
-    ratio: float = 0.0
+    ratio: float = 0.01
+
+
+
+    # symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]    
+    interval: str = "1m"
+    start_date: str = "2025-02-01"
+    end_date: str = "2025-03-01"
+    output_dir: str = "/Users/lizeyu/Desktop/qoc/tmp/raw/1m_klines_raw"
+
+    limit_order_time: int = 3  # minutes
+
+
 
 
 @attrs.define
 class StrategyGrid(qoc.StrategySingleSymbol):
     # Config
-    quantity: float = attrs.field(metadata={"dump": False})
-    ratio: float = attrs.field(default=0.01, metadata={"dump": False})
+    quantity: float = attrs.field(default=0.0, metadata={"dump": False})
+    ratio: float = attrs.field(default=0.001, metadata={"dump": False})
 
-    # State
-    base_price: float | None = attrs.field(default=None, metadata={"dump": True})
+    # State - 使用字典按symbol分组
+    base_prices: dict[str, float | None] = attrs.field(factory=dict, metadata={"dump": True})
 
+    def get_base_price(self, symbol: str) -> float | None:
+        return self.base_prices.get(symbol)
+
+    def set_base_price(self, symbol: str, price: float | None) -> None:
+        self.base_prices[symbol] = price
+
+    def get_price_upper(self, symbol: str) -> float:
+        base_price = self.get_base_price(symbol)
+        if base_price is None:
+            return -math.inf
+        return base_price * (1 + self.ratio)
+
+    def get_price_lower(self, symbol: str) -> float:
+        base_price = self.get_base_price(symbol)
+        if base_price is None:
+            return math.inf
+        return base_price * (1 - self.ratio)
+
+    @property
+    def base_price(self) -> float | None:
+        if not self.symbols:
+            return None
+        return self.get_base_price(self.symbols[0])
+    
+    @base_price.setter
+    def base_price(self, value: float | None) -> None:
+        if not self.symbols:
+            return
+        self.set_base_price(self.symbols[0], value)
+    
     @property
     def price_upper(self) -> float:
-        if self.base_price is None:
+        if not self.symbols:
             return -math.inf
-        return self.base_price * (1 + self.ratio)
-
+        return self.get_price_upper(self.symbols[0])
+    
     @property
     def price_lower(self) -> float:
-        if self.base_price is None:
+        if not self.symbols:
             return math.inf
-        return self.base_price * (1 - self.ratio)
+        return self.get_price_lower(self.symbols[0])
 
-    @override
+    # @override
     def step(
-        self, api: qoc.ApiBinance, market: qoc.Market, now: datetime.datetime
+        self, api: api.ApiBinance|api.ApiOffline, market: qoc.Market, now: datetime.datetime
     ) -> None:
-        price: float = market.tail(self.symbol, n=1)["close"].iloc[-1]
-        if self.base_price is None:
-            self.base_price = price
-            logger.debug("Initialize base price: {}", self.base_price)
-            return
-        logger.info("close: {}", price)
-        if price < self.price_lower:
-            resp = api.order_market(
-                self.symbol, qoc.api.OrderSide.BUY, quantity=self.quantity
-            )
-            logger.debug("BUY > {}: {}", self.symbol, price)
-            self.base_price = price
-        elif price > self.price_upper:
-            resp = api.order_market(
-                self.symbol, qoc.api.OrderSide.SELL, quantity=self.quantity
-            )
-            logger.info("close: {}; price: {}", price, resp.price)
-            logger.debug("SELL > {}: {}", self.symbol, price)
-            self.base_price = price
+        for symbol in self.symbols:
+            price: float = market.tail(symbol, n=1)["close"].iloc[-1]
+            if self.base_price is None:
+                self.base_price = price
+                logger.debug("Initialize base price: {}", self.base_price)
+                return
+            logger.info("close: {}", price)
+            if price < self.price_lower:
+                resp = api.order_market(
+                    symbol, qoc.api.OrderSide.BUY, quantity=self.quantity
+                )
+                logger.debug("BUY > {}: {}", symbol, price)
+                self.base_price = price
+            elif price > self.price_upper:
+                resp = api.order_market(
+                    symbol, qoc.api.OrderSide.SELL, quantity=self.quantity
+                )
+                logger.info("close: {}; price: {}", price, resp.price)
+                logger.debug("SELL > {}: {}", symbol, price)
+                self.base_price = price
 
 
 def main(cfg: Config) -> None:
-    api: qoc.ApiBinance = qoc.ApiBinance.create()
+    library = qoc.Database(uri=cfg.db).get_library("strategy")
+
+    api: qoc.ApiBinance | qoc.ApiOffline
+
+    if cfg.online:
+        api = qoc.ApiBinance.create()
+    else:
+        from offline_fetch import fetch_for_offline
+        import arcticdb as adb
+
+        uri = "lmdb://examples/grid-strategy/data/database_offline/"
+
+
+        ac = adb.Arctic(uri)
+
+        qoc_library = ac.get_library('market', create_if_missing=True)
+
+
+
+        fetch_for_offline(cfg.symbols, cfg.interval, cfg.start_date, cfg.end_date, cfg.output_dir, qoc_library)
+
+        
+        api = qoc.ApiOffline.create(qoc_library, cfg.symbols, cfg.start_date, cfg.end_date)
+        
     db = qoc.Database(uri=cfg.db)
     market = qoc.Market(
-        library=db.get_library("market"), symbols=[cfg.symbol], interval="1s"
+        library=db.get_library("market"), symbols=cfg.symbols, interval="1m"
     )
-    balance = qoc.Balance(library=db.get_library("balance"), symbols=[cfg.symbol])
+    balance = qoc.Balance(library=db.get_library("balance"), symbols=cfg.symbols)
     strategy = StrategyGrid(
         library=db.get_library("strategy"),
-        symbol=cfg.symbol,
+        symbols=cfg.symbols,
         quantity=cfg.quantity,
         ratio=cfg.ratio,
     )
 
-    logger.debug(api.exchange_info(symbol=cfg.symbol))
+    # logger.debug(api.exchange_info(symbol=cfg.symbol))
 
     for now in qoc.clock(
-        interval=datetime.timedelta(seconds=1), max_duration=cfg.max_duration
+        interval=datetime.timedelta(seconds=1), offline=not cfg.online
     ):
+        end_now = api.step()
         market.step(api=api)  # get klines
         strategy.step(api=api, market=market, now=now)
-        strategy.dump(now=now)
+        # strategy.dump(now=now)
         balance.step(api=api, market=market, now=now)
 
 

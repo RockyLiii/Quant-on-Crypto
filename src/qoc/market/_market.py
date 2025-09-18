@@ -20,21 +20,13 @@ class Market:
         price: float = df["close"].iloc[-1]
         return qty * price
 
-    def step(self, api: api.ApiBinance) -> None:
+    def step(self, api: api.ApiBinance|api.ApiOffline) -> None:
         for symbol in self.symbols:
             klines: pl.DataFrame = api.klines(symbol, self.interval)
-            ic(klines)
+            # ic(klines)
+
             self.library.append(symbol, klines)
 
-    def step_offline(self, library, coins, interval, now) -> None:
-        for symbol in self.symbols:
-            symbol_key = f"{symbol}_klines_{interval}"
-
-            df: pd.DataFrame = library.read(symbol_key).data
-
-            now_kline = df[df.index == now]
-
-            self.library.append(symbol, now_kline)
 
     def tail(
         self, symbol: str, n: int = 5, columns: Sequence[str] | None = None
