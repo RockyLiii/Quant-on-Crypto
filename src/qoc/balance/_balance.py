@@ -22,6 +22,8 @@ class Balance:
         balances_df = utils.insert_time(balances_df, now)
         self.library.append("balance", balances_df)
 
+            
+
         # quote_dict: dict[str, float] = collections.defaultdict(lambda: 0.0)
         # exchange_info: _api.ExchangeInfo = api.exchange_info(symbols=self.symbols)
         # for symbol in self.symbols:

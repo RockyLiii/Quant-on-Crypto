@@ -24,6 +24,7 @@ from ._typing import TimeUnit
 @attrs.define
 class ApiBinance:
     client: binance.spot.Spot = attrs.field()
+    symbol_average_price: dict[str, float] = attrs.field(factory=dict) # TODO
 
     @classmethod
     def create(

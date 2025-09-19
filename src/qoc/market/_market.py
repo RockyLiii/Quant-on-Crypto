@@ -1,4 +1,7 @@
 from collections.abc import Sequence
+from typing import Any
+
+import datetime
 
 import attrs
 import pandas as pd
@@ -27,8 +30,8 @@ class Market:
 
             self.library.append(symbol, klines)
 
-
     def tail(
         self, symbol: str, n: int = 5, columns: Sequence[str] | None = None
     ) -> pd.DataFrame:
         return self.library.tail(symbol, n=n, columns=columns)
+

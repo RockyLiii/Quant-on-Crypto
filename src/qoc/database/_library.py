@@ -17,9 +17,9 @@ type NormalizableType = pd.DataFrame | pl.DataFrame
 class Library:
     library: adb.library.Library = attrs.field()
 
-    @grapes.timer(
-        cb_stop=grapes.timing.callback.log_record(level="WARNING", threshold_sec=0.0)
-    )
+    # @grapes.timer(
+    #     cb_stop=grapes.timing.callback.log_record(level="WARNING", threshold_sec=0.0)
+    # )
     def append(self, symbol: str, data: NormalizableType, /, **kwargs) -> None:
         data = self._normalize_data(data)
         if self.has_symbol(symbol):
@@ -28,9 +28,9 @@ class Library:
             return
         self.library.append(symbol, data, **kwargs)
 
-    @grapes.timer(
-        cb_stop=grapes.timing.callback.log_record(level="WARNING", threshold_sec=0.0)
-    )
+    # @grapes.timer(
+    #     cb_stop=grapes.timing.callback.log_record(level="WARNING", threshold_sec=0.0)
+    # )
     def append_batch(
         self, data: Iterable[tuple[str, NormalizableType]], /, **kwargs
     ) -> None:

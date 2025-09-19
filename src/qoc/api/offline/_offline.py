@@ -20,13 +20,18 @@ class ApiOffline(TradingApi):
 
     monitor_account: dict = attrs.field(factory=dict)
 
+    transaction_fee: float = attrs.field(default=0.001)  # 交易费用为0.1%
+
+
     timestamps: list[int] = attrs.field(factory=list)  # 修改为 list[int]
     now_index: int = attrs.field(default=0)
     interval: int = attrs.field(default=60 * 1000000) 
 
+    symbol_average_price: dict[str, float] = attrs.field(factory=dict) # 记录每个交易对的平均持仓价格
+
 # cfg.symbols, cfg.interval, cfg.start_date, cfg.end_date, cfg.output_dir
     @classmethod
-    def create(cls, library: adb.library.Library, symbols: list[str], start_date: str, end_date: str) -> Self:
+    def create(cls, library: adb.library.Library, transaction_fee: float,symbols: list[str], start_date: str, end_date: str) -> Self:
         from datetime import datetime, timedelta
         import pandas as pd
         
@@ -132,7 +137,7 @@ class ApiOffline(TradingApi):
         
         # 创建实例并设置时间戳
         instance = cls(library=library)
-
+        instance.transaction_fee = transaction_fee
 
         instance.timestamps = timestamps
         instance.now_index = timestamps[0]
@@ -295,11 +300,10 @@ class ApiOffline(TradingApi):
         quantity: float | None = None,
         quoteOrderQty: float | None = None,
         timestamp: datetime | None = None,
-        lock_rate: float = 1.0,  # 保证金倍数参数，默认为1倍
+        lock_rate: float = 1.0,  # 保证金比例
         **kwargs,
     ) -> OrderResponseFull:
         now = self.now_index
-        transaction_fee = 0.001  # 交易费用为0.1%
         
         try:
             # 获取当前时间点的价格数据
@@ -327,7 +331,7 @@ class ApiOffline(TradingApi):
                 except (ValueError, TypeError, KeyError):
                     raise ValueError(f"无法获取有效的收盘价格数据 (时间戳: {now})")
 
-            print(f"执行市价单: {symbol}, 方向: {side}, 价格: {price}, 数量: {quantity}")
+            # print(f"执行市价单: {symbol}, 方向: {side}, 价格: {price}, 数量: {quantity}")
             
             # 交易的基础资产和报价资产
             base_asset = symbol.replace("USDT", "")
@@ -341,12 +345,31 @@ class ApiOffline(TradingApi):
                 return 0.0
             
             # 辅助函数：更新资产余额
+            # TODO: 1. 处理卖空保证金逻辑 2. 记录持仓均价
             def update_asset_balance(asset, amount, balance_type="free"):
+                delta_usdt_locked = 0.0
                 for balance in self.monitor_account["balances"]:
                     if balance["asset"] == asset:
                         current_amount = float(balance[balance_type])
+
+                        if current_amount<=0 and asset!= "USDT":
+                            current_usdt_locked = float(get_asset_balance("USDT","locked"))
+                            current_average_price = self.symbol_average_price.get(asset, 0)
+
+                            delta_usdt_locked = amount*current_average_price*lock_rate
+
+                          
+                            
+
                         balance[balance_type] = str(current_amount + amount)
-                        return
+
+                        if current_amount * amount >= 0:
+
+                            new_average_price = (current_amount*self.symbol_average_price.get(asset, 0) + amount*price) / (current_amount + amount) if (current_amount + amount) != 0 else 0
+                            self.symbol_average_price[asset] = new_average_price
+                        
+                        break   
+                return delta_usdt_locked
                 
                 # 如果资产不存在，添加新资产
                 new_balance = {
@@ -356,7 +379,7 @@ class ApiOffline(TradingApi):
                 }
                 new_balance[balance_type] = str(amount)
                 self.monitor_account["balances"].append(new_balance)
-            
+
             # 买入逻辑
             if side == "BUY":
                 if quantity is None:
@@ -364,20 +387,61 @@ class ApiOffline(TradingApi):
                     
                 # 计算所需的USDT金额（包含手续费）
                 quote_amount = quantity * price
-                fee_amount = quote_amount * transaction_fee
+                fee_amount = quote_amount * self.transaction_fee
                 total_cost = quote_amount + fee_amount
                 
                 # 检查余额是否足够
                 usdt_free = get_asset_balance(quote_asset)
-                if usdt_free < total_cost:
-                    raise ValueError(f"Insufficient {quote_asset} balance: {usdt_free} < {total_cost}")
-                
-                # 直接扣除USDT余额
-                update_asset_balance(quote_asset, -total_cost)
-                # 增加基础资产
-                update_asset_balance(base_asset, quantity)
-                
-                print(f"买入 {quantity} {base_asset} 花费 {total_cost} {quote_asset} (含手续费 {fee_amount})")
+                base_free = get_asset_balance(base_asset)
+                if base_free>=0:
+                    if usdt_free < total_cost:
+                        raise ValueError(f"Insufficient {quote_asset} balance: {usdt_free} < {total_cost}")
+                    
+                    # 直接扣除USDT余额
+                    update_asset_balance(quote_asset, -total_cost)
+                    # 增加基础资产
+                    update_asset_balance(base_asset, quantity)
+                    
+                    # print(f"买入 {quantity} {base_asset} 花费 {total_cost} {quote_asset} (含手续费 {fee_amount})")
+                else:
+                    # 全部平掉空头仓位
+                    short_position = -base_free  # 负数仓位转为正数
+                    remaining_quantity = quantity - short_position
+                    
+                    cover_quantity = quantity if remaining_quantity < 0 else short_position
+    
+                    # 平空头部分
+                    cover_cost = cover_quantity * price
+                    cover_fee = cover_cost * self.transaction_fee
+                    
+                    # 回补空头仓位
+                    delta_usdt_locked = update_asset_balance(base_asset, cover_quantity)
+
+                    current_average_price = self.symbol_average_price.get(base_asset, 0)
+                    pnl = (current_average_price - price) * cover_quantity - cover_fee
+
+                    update_asset_balance(quote_asset, pnl)
+                    update_asset_balance(quote_asset, -delta_usdt_locked, "locked")
+                    update_asset_balance(quote_asset, delta_usdt_locked, "free")
+
+
+
+                    if remaining_quantity >0:
+
+                        remaining_quote_amount = remaining_quantity * price
+                        remaining_fee = remaining_quote_amount * self.transaction_fee
+                        remaining_total_cost = remaining_quote_amount + remaining_fee
+
+                        usdt_free = get_asset_balance(quote_asset)
+
+                        if usdt_free < remaining_total_cost:
+                            raise ValueError(f"Insufficient {quote_asset} balance for remaining buy: {usdt_free} < {remaining_total_cost}")
+                        
+                        update_asset_balance(quote_asset, -remaining_total_cost)
+                        update_asset_balance(base_asset, remaining_quantity)
+                        
+                        # print(f"买入剩余 {remaining_quantity} {base_asset} 花费 {remaining_total_cost} {quote_asset} (含手续费 {remaining_fee})")
+
                     
             # 卖出逻辑
             elif side == "SELL":
@@ -389,14 +453,14 @@ class ApiOffline(TradingApi):
                 
                 # 计算卖出的USDT金额
                 quote_amount = quantity * price
-                fee_amount = quote_amount * transaction_fee
+                fee_amount = quote_amount * self.transaction_fee
                 net_received = quote_amount - fee_amount
                 
                 # 情况1: 有足够余额直接卖出
                 if base_free >= quantity:
                     update_asset_balance(base_asset, -quantity)
                     update_asset_balance(quote_asset, net_received)
-                    print(f"卖出 {quantity} {base_asset} 获得 {net_received} {quote_asset} (扣除手续费 {fee_amount})")
+                    # print(f"卖出 {quantity} {base_asset} 获得 {net_received} {quote_asset} (扣除手续费 {fee_amount})")
                 
                 # 情况2: 余额不足，先卖出已有余额，再做空剩余部分
                 else:
@@ -404,36 +468,33 @@ class ApiOffline(TradingApi):
                     # 1. 先卖出已有的余额
                     if base_free > 0:
                         partial_quote_amount = base_free * price
-                        partial_fee = partial_quote_amount * transaction_fee
+                        partial_fee = partial_quote_amount * self.transaction_fee
                         partial_net = partial_quote_amount - partial_fee
                         
                         update_asset_balance(base_asset, -base_free)
                         update_asset_balance(quote_asset, partial_net)
-                        print(f"卖出可用余额 {base_free} {base_asset} 获得 {partial_net} {quote_asset}")
+                        # print(f"卖出可用余额 {base_free} {base_asset} 获得 {partial_net} {quote_asset}")
+                        quantity -= base_free
                     
                     # 2. 剩余部分使用保证金做空
-                    remaining_quantity = quantity - base_free
+                    remaining_quantity = quantity 
                     short_quote_amount = remaining_quantity * price
-                    short_fee = short_quote_amount * transaction_fee
+                    short_fee = short_quote_amount * self.transaction_fee
                     
                     # 计算需要锁定的保证金 (使用lock_rate倍保证金)
-                    required_margin = short_quote_amount / lock_rate
+                    required_margin = short_quote_amount * lock_rate
                     
                     # 检查USDT余额是否足够作为保证金
                     if get_asset_balance(quote_asset) < required_margin:
                         raise ValueError(f"Insufficient {quote_asset} for margin: {get_asset_balance(quote_asset)} < {required_margin}")
                     
-                    # 锁定保证金 (从free移到locked)
-                    update_asset_balance(quote_asset, -required_margin)
+                    update_asset_balance(quote_asset, -required_margin, "free")
                     update_asset_balance(quote_asset, required_margin, "locked")
-                    
-                    # 创建做空头寸记录 (可以添加到监控账户的额外字段中)
-                    # 这里简化处理，只在base_asset中记录负数余额
+                    update_asset_balance(quote_asset, - short_fee)
                     update_asset_balance(base_asset, -remaining_quantity)
-                    update_asset_balance(quote_asset, short_quote_amount - short_fee)
-                    
-                    print(f"做空 {remaining_quantity} {base_asset} 使用保证金 {required_margin} {quote_asset} (杠杆率: {lock_rate})")
-                    print(f"做空获得 {short_quote_amount - short_fee} {quote_asset} (扣除手续费 {short_fee})")
+
+                    # print(f"做空 {remaining_quantity} {base_asset} 使用保证金 {required_margin} {quote_asset} (保证金比率: {lock_rate})")
+                    # print(f"做空获得 {short_quote_amount - short_fee} {quote_asset} (扣除手续费 {short_fee})")
             
             # 创建订单响应对象
             from qoc.api.typing import OrderResponseFull, OrderResponseFill, OrderType, OrderSide
@@ -485,9 +546,11 @@ class ApiOffline(TradingApi):
 
 
     def step(self) -> bool:
+        # print(f"Balance at {self.now_index}: {self.monitor_account['balances']}")
+
         if self.now_index + self.interval <= self.timestamps[-1]:
             self.now_index += self.interval
-            print(f"时间推进到: {self.now_index} ")
+            # print(f"时间推进到: {self.now_index} ")
             return False
         else:
             return True
