@@ -34,7 +34,7 @@ class Config(cherries.BaseConfig):
     transaction_fee: float = 0.01  # 交易费用为0.1%
     interval: str = "1m"
     start_date: str = "2025-02-01"
-    end_date: str = "2025-02-04"
+    end_date: str = "2025-02-02"
     output_dir: str = "/Users/lizeyu/Desktop/qoc/tmp/raw/1m_klines_raw"
 
     limit_order_time: int = 3  # minutes
@@ -56,8 +56,10 @@ class StrategyGrid(qoc.StrategySingleSymbol):
     base_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
     upper_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
     lower_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
-    current_value: float = attrs.field(factory=float, metadata={"dump": True})
-    value_array: list[float] = attrs.field(factory=list, metadata={"dump": True})
+    current_values: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
+
+    current_value: float = attrs.field(factory=float, metadata={"dump": False})
+    value_array: list[float] = attrs.field(factory=list, metadata={"dump": False})
 
     # ===== 辅助方法 =====
     def _ensure_symbol(self, symbol: str) -> None:
@@ -163,28 +165,49 @@ class StrategyGrid(qoc.StrategySingleSymbol):
         # logger.info(f"CURRENT VALUE: {self.current_value}")
         self.value_array.append(self.current_value)
 
+        if 'Total' not in self.current_values:
+            self.current_values['Total'] = 0.0
+        self.current_values['Total'] = self.current_value
+
 
 # 计算总步数
 def calculate_total_steps(start_date, end_date, interval):
+    """计算从开始日期到结束日期间的总步数"""
     start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     
-    # 计算总天数
-    days = (end - start).days
+    # 计算总时间范围（秒）
+    total_seconds = (end - start).total_seconds()
     
-    # 根据间隔计算每天的步数
+    # 获取每步的时间增量
+    time_delta = get_time_delta(interval)
+    step_seconds = time_delta.total_seconds()
+    
+    # 计算总步数
+    total_steps = int(total_seconds / step_seconds)
+    
+    return total_steps
+
+# 创建一个函数来根据interval获取时间增量
+def get_time_delta(interval: str) -> datetime.timedelta:
+    """根据间隔字符串返回相应的时间增量"""
     if interval == "1m":
-        steps_per_day = 24 * 60  # 每分钟一步
+        return datetime.timedelta(minutes=1)
     elif interval == "5m":
-        steps_per_day = 24 * 12  # 每5分钟一步
+        return datetime.timedelta(minutes=5)
     elif interval == "15m":
-        steps_per_day = 24 * 4   # 每15分钟一步
+        return datetime.timedelta(minutes=15)
+    elif interval == "30m":
+        return datetime.timedelta(minutes=30)
     elif interval == "1h":
-        steps_per_day = 24       # 每小时一步
+        return datetime.timedelta(hours=1)
+    elif interval == "4h":
+        return datetime.timedelta(hours=4)
+    elif interval == "1d":
+        return datetime.timedelta(days=1)
     else:
-        steps_per_day = 24 * 60  # 默认每分钟一步
-    
-    return days * steps_per_day
+        # 默认为1分钟
+        return datetime.timedelta(minutes=1)
 
 # 在 main 函数中添加进度条
 def main(cfg: Config) -> None:
@@ -209,19 +232,15 @@ def main(cfg: Config) -> None:
 
         uri = "lmdb://examples/grid-strategy/data/database_offline/"
 
-
         ac = adb.Arctic(uri)
 
         qoc_library = ac.get_library('market', create_if_missing=True)
 
-
-
         fetch_for_offline(cfg.symbols, cfg.interval, cfg.start_date, cfg.end_date, cfg.output_dir, qoc_library)
 
-        
         api = qoc.ApiOffline.create(qoc_library, cfg.transaction_fee ,cfg.symbols, cfg.start_date, cfg.end_date)
         
-    library = qoc.Database(uri=cfg.db).get_library("strategy")
+
     db = qoc.Database(uri=cfg.db)
     market = qoc.Market(
         library=db.get_library("market"), symbols=cfg.symbols, interval="1m"
@@ -239,93 +258,42 @@ def main(cfg: Config) -> None:
     # 计算总步数
     total_steps = calculate_total_steps(cfg.start_date, cfg.end_date, cfg.interval)
     
-
+    
+    # 获取适当的时间增量
+    time_delta = get_time_delta(cfg.interval) if not cfg.online else datetime.timedelta(seconds=0.1)
+    
     # 创建进度条
     with tqdm(total=total_steps, desc="回测进度", unit="步") as pbar:
-        # 初始化计时器和计数器
-        import time
-        step_times = {
-            "api.step()": 0.0,
-            "market.step()": 0.0,
-            "strategy.step()": 0.0,
-            "balance.step()": 0.0,
-            "strategy.dump()": 0.0,
-            "tqdm_update": 0.0,
-        }
-        iteration_count = 0
         
+        # 跟踪已处理的步数
+        step_count = 0
+
+        if not cfg.online:
+            now_ts = datetime.datetime.strptime(cfg.start_date, "%Y-%m-%d")
+
         for now in qoc.clock(
-            interval=datetime.timedelta(seconds=1), offline=not cfg.online
+            interval=datetime.timedelta(seconds=0.1), offline=not cfg.online
         ):
-            iteration_count += 1
-            loop_start = time.time()
+            ts = now if cfg.online else now_ts
+            # 执行回测逻辑    
+            end_now = api.step()  # 确保调用了api.step()获取结束状态
             
-            # 计时 api.step()
-            start_time = time.time()
-            end_now = api.step()
-            step_times["api.step()"] += time.time() - start_time
-            
-            # 计时 market.step()
-            start_time = time.time()
             market.step(api=api)  # get klines
-            step_times["market.step()"] += time.time() - start_time
+            strategy.step(api=api, market=market, now=ts)
+            balance.step(api=api, market=market, now=ts)
+            strategy.dump(now=ts)
             
-            # 计时 strategy.step()
-            start_time = time.time()
-            strategy.step(api=api, market=market, now=now)
-            step_times["strategy.step()"] += time.time() - start_time
-            
-            # 计时 balance.step()
-            start_time = time.time()
-            balance.step(api=api, market=market, now=now)
-            step_times["balance.step()"] += time.time() - start_time
-            
-            # 计时 strategy.dump()
-            start_time = time.time()
-            # strategy.dump(now=now)
-            step_times["strategy.dump()"] += time.time() - start_time
-            
-            # 计时 tqdm 更新
-            start_time = time.time()
+            # 更新进度条
+            step_count += 1
             pbar.update(1)
-            pbar.set_description(f"回测时间: {now.strftime('%Y-%m-%d %H:%M')}")
-            step_times["tqdm_update"] += time.time() - start_time
+            pbar.set_description(f"回测时间: {ts.strftime('%Y-%m-%d %H:%M')}")
             
-            # 每20次迭代打印一次性能分析
-            if iteration_count % 20 == 0:
-                value_array = strategy.value_array
-                fig_path = "examples/grid-strategy/value.png"
-                import matplotlib.pyplot as plt
-                plt.figure(figsize=(12, 6))
-                plt.plot(value_array)
-                plt.savefig(fig_path)
-                total_time = sum(step_times.values())
-                if total_time > 0:  # 避免除零错误
-                    print("\n性能分析 (前 {} 次迭代):".format(iteration_count))
-                    for step_name, step_time in step_times.items():
-                        percentage = (step_time / total_time) * 100
-                        print(f"  {step_name:<15}: {step_time:.4f}秒 ({percentage:.2f}%)")
-                    print(f"  总执行时间: {total_time:.4f}秒")
-                    print(f"  平均每次迭代: {total_time/iteration_count:.4f}秒")
-                    print("-" * 50)
+            # 使用动态时间增量
+            now_ts += time_delta
             
-            # 如果回测结束，则跳出循环
+            # 检查是否达到最大步数或回测结束
             if end_now:
                 break
-
-
-    # 打印最终性能统计
-    total_time = sum(step_times.values())
-    if total_time > 0:
-        print("\n最终性能分析:")
-        # 按时间降序排序
-        sorted_steps = sorted(step_times.items(), key=lambda x: x[1], reverse=True)
-        for step_name, step_time in sorted_steps:
-            percentage = (step_time / total_time) * 100
-            print(f"  {step_name:<15}: {step_time:.4f}秒 ({percentage:.2f}%)")
-        print(f"  总执行时间: {total_time:.4f}秒")
-        print(f"  总迭代次数: {iteration_count}")
-        print(f"  平均每次迭代: {total_time/iteration_count:.4f}秒")
 
 if __name__ == "__main__":
     cherries.run(main, profile="playground")
