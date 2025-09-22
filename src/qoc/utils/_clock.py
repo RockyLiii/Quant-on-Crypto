@@ -73,7 +73,7 @@ def _ticks(
     max_iter: int | None = None,
     start: datetime.datetime,
 ) -> Generator[datetime.datetime]:
-    now: datetime.datetime = start
+    now: datetime.datetime = start + interval
     for it in itertools.count():
         if max_iter is not None and it >= max_iter:
             break
