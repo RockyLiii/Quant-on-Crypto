@@ -132,7 +132,6 @@ class StrategyRev(qoc.StrategySingleSymbol):
                     and ch < self.max_holdings
                     and self.minute_count % 5 == 0
                     and order_count < self.max_holdings
-
                 ):
                     quantity = self.bullet_size / price
                     try:
