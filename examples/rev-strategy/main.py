@@ -15,7 +15,7 @@ from qoc import api
 
 class Config(cherries.BaseConfig):
     db: str = qoc.data_dir("database").as_uri().replace("file://", "lmdb://")
-    online: bool = True
+    online: bool = False
     symbols: list[str] = ["BTCUSDT"]
     past_threshold: float = -0.02  # 过去5小时跌幅超过2%
     past_window: int = 60 * 5  # 5 hours with 5-minute intervals
