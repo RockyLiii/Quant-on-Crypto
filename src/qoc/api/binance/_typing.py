@@ -17,6 +17,11 @@ class TimeUnit(enum.StrEnum):
     def from_datetime(self, datetime: datetime.datetime) -> int:
         return int(datetime.timestamp() * TIME_UNIT_FROM_SECONDS[self])
 
+    def from_int(self, timestamp: int) -> datetime.datetime:
+        return datetime.datetime.fromtimestamp(
+            timestamp / TIME_UNIT_FROM_SECONDS[self], tz=datetime.UTC
+        )
+
 
 TIME_UNIT_TO_POLARS: Mapping[TimeUnit, TimeUnitPolars] = {
     TimeUnit.MICROSECOND: "us",

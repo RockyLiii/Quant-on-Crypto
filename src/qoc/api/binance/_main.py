@@ -1,5 +1,5 @@
 import datetime
-from typing import Self
+from typing import Any, Self
 
 import attrs
 import binance.spot
@@ -24,7 +24,7 @@ from ._typing import TimeUnit
 @attrs.define
 class ApiBinance:
     client: binance.spot.Spot = attrs.field()
-    symbol_average_price: dict[str, float] = attrs.field(factory=dict) # TODO
+    symbol_average_price: dict[str, float] = attrs.field(factory=dict)  # TODO
 
     @classmethod
     def create(
@@ -84,53 +84,52 @@ class ApiBinance:
         symbol: str,
         interval: Interval,
         *,
-        start_time: datetime.datetime | None = None,
+        startTime: datetime.datetime | None = None,
+        endTime: datetime.datetime | None = None,
         **kwargs,
     ) -> pl.DataFrame:
-        if start_time:
-            kwargs["startTime"] = self.timeunit.from_datetime(start_time)
-        response: list[list[int | str]] = self.client.klines(
-            symbol=symbol, interval=interval, **kwargs
-        )
+        raw: list[list[Any]] = []
+        time: datetime.datetime | None = startTime
+        while (time is None) or (endTime is None) or (time < endTime):
+            if time is not None:
+                kwargs["startTime"] = self.timeunit.from_datetime(time)
+            if endTime is not None:
+                kwargs["endTime"] = self.timeunit.from_datetime(endTime)
+            delta: list[list[Any]] = self.client.klines(
+                symbol=symbol, interval=interval, **kwargs
+            )
+            if len(delta) == 0:
+                break
+            raw.extend(delta)
+            time = self.timeunit.from_int(delta[-1][6])
         data: pl.DataFrame = pl.from_records(
-            response,
-            schema=[
+            raw,
+            [
                 (
                     "open_time",
-                    pl.Datetime(time_unit=self.timeunit.to_polars),
-                ),  # Kline open time
-                ("open", pl.Float64),  # Open price
-                ("high", pl.Float64),  # High price
-                ("low", pl.Float64),  # Low price
-                ("close", pl.Float64),  # Close price
-                ("volume", pl.Float64),  # Volume
+                    pl.Datetime(
+                        time_unit=self.timeunit.to_polars, time_zone=datetime.UTC
+                    ),
+                ),
+                ("open", pl.Float64),
+                ("high", pl.Float64),
+                ("low", pl.Float64),
+                ("close", pl.Float64),
+                ("volume", pl.Float64),
                 (
                     "close_time",
-                    pl.Datetime(time_unit=self.timeunit.to_polars),
-                ),  # Kline Close time
-                ("quote_volume", pl.Float64),  # Quote asset volume
-                ("count", pl.Int64),  # Number of trades
-                ("taker_buy_volume", pl.Float64),  # Taker buy base asset volume
-                ("taker_buy_quote_volume", pl.Float64),  # Taker buy quote asset volume
-                ("ignore", pl.Int64),  # Unused field, ignore.
+                    pl.Datetime(
+                        time_unit=self.timeunit.to_polars, time_zone=datetime.UTC
+                    ),
+                ),
+                ("quote_asset_volume", pl.Float64),
+                ("number_of_trades", pl.Int64),
+                ("taker_buy_base_asset_volume", pl.Float64),
+                ("taker_buy_quote_asset_volume", pl.Float64),
+                ("ignore", pl.String),
             ],
             orient="row",
         )
-
-
-        # 将 Datetime 时间戳转换为整数微秒时间戳
-        time_unit_multiplier = {
-            "ns": 0.001,  # 纳秒转微秒需要除以 1000
-            "us": 1,      # 微秒保持不变
-            "ms": 1000,   # 毫秒转微秒需要乘以 1000
-            "s": 1000000, # 秒转微秒需要乘以 1000000
-        }[self.timeunit.to_polars]
-
-        # 转换时间列为整数微秒时间戳
-        data = data.with_columns([
-            pl.col("open_time").dt.epoch("us").alias("open_time"),
-            pl.col("close_time").dt.epoch("us").alias("close_time")
-        ])
         return data
 
     # endregion Market Data
