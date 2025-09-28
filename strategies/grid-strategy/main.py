@@ -2,20 +2,18 @@ import datetime
 import math
 import os
 import sys
-from typing import override
 
 import attrs
 from liblaf import cherries
-from loguru import logger
 from tqdm import tqdm
-
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
 )
 
-import qoc 
-import qoc.api as api # pyright: ignore
+import qoc
+from qoc import api  # pyright: ignore
+
 
 class Config(cherries.BaseConfig):
     db: str = qoc.data_dir("database").as_uri().replace("file://", "lmdb://")
@@ -24,13 +22,11 @@ class Config(cherries.BaseConfig):
     # strategy config
 
     online: bool = False
-    symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]    
+    symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]
     quantity: float = 1e-3
     ratio: float = 0.001
 
-
-
-    # symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]    
+    # symbols: list[str] = ["BTCUSDT", "DOGEUSDT"]
     transaction_fee: float = 0.01  # 交易费用为0.1%
     interval: str = "1m"
     start_date: str = "2025-02-01"
@@ -39,11 +35,8 @@ class Config(cherries.BaseConfig):
 
     limit_order_time: int = 3  # minutes
 
-import math
-import datetime
-import attrs
-from loguru import logger
-from typing import Optional
+
+
 
 @attrs.define
 class StrategyGrid(qoc.StrategySingleSymbol):
@@ -56,7 +49,9 @@ class StrategyGrid(qoc.StrategySingleSymbol):
     base_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
     upper_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
     lower_prices: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
-    current_values: dict[str, float] = attrs.field(factory=dict, metadata={"dump": True})
+    current_values: dict[str, float] = attrs.field(
+        factory=dict, metadata={"dump": True}
+    )
 
     current_value: float = attrs.field(factory=float, metadata={"dump": False})
     value_array: list[float] = attrs.field(factory=list, metadata={"dump": False})
@@ -71,7 +66,7 @@ class StrategyGrid(qoc.StrategySingleSymbol):
         if symbol not in self.lower_prices:
             self.lower_prices[symbol] = 0.0
 
-    def set_base_price(self, symbol: str, price: Optional[float]) -> None:
+    def set_base_price(self, symbol: str, price: float | None) -> None:
         self._ensure_symbol(symbol)
         # 同步 upper/lower
         if price is not None:
@@ -82,7 +77,7 @@ class StrategyGrid(qoc.StrategySingleSymbol):
             self.upper_prices[symbol] = 0.0
             self.lower_prices[symbol] = 0.0
 
-    def get_base_price(self, symbol: str) -> Optional[float]:
+    def get_base_price(self, symbol: str) -> float | None:
         return self.base_prices.get(symbol)
 
     def get_price_upper(self, symbol: str) -> float:
@@ -95,11 +90,11 @@ class StrategyGrid(qoc.StrategySingleSymbol):
 
     # ===== 单一 symbol 便捷属性 =====
     @property
-    def base_price(self) -> Optional[float]:
+    def base_price(self) -> float | None:
         return self.get_base_price(self.symbols[0]) if self.symbols else None
 
     @base_price.setter
-    def base_price(self, value: Optional[float]) -> None:
+    def base_price(self, value: float | None) -> None:
         if self.symbols:
             self.set_base_price(self.symbols[0], value)
 
@@ -113,17 +108,17 @@ class StrategyGrid(qoc.StrategySingleSymbol):
 
     # ===== 核心策略 =====
     def step(
-        self, api: api.ApiBinance | api.ApiOffline,
+        self,
+        api: api.ApiBinance | api.ApiOffline,
         market: qoc.Market,
-        now: datetime.datetime
+        now: datetime.datetime,
     ) -> None:
         current_balance: dict[str, float] = {
             b.asset: b.free + b.locked for b in api.account().balances
         }
         current_price: dict[str, float] = {}
-        
-        self.current_value = current_balance.get("USDT", 0.0)
 
+        self.current_value = current_balance.get("USDT", 0.0)
 
         for symbol in self.symbols:
             price: float = market.tail(symbol, n=1)["close"].iloc[-1]
@@ -141,8 +136,8 @@ class StrategyGrid(qoc.StrategySingleSymbol):
                 position_size = abs(current_balance.get(coinname, 0.0))
                 entry_price = api.symbol_average_price.get(coinname, price)
                 pnl = position_size * (entry_price - price)
-                
-                self.current_value +=  pnl
+
+                self.current_value += pnl
                 # print(f"空头持仓: {coinname} 入场价: {entry_price}, 当前价: {price}, 盈亏: {pnl}")
 
             # logger.info("Current price for {}: {}, base: {}, upper: {}, lower: {}",
@@ -154,20 +149,24 @@ class StrategyGrid(qoc.StrategySingleSymbol):
                 continue
 
             if price < self.get_price_lower(symbol):
-                resp = api.order_market(symbol, qoc.api.OrderSide.BUY, quantity=self.quantity)
+                resp = api.order_market(
+                    symbol, qoc.api.OrderSide.BUY, quantity=self.quantity
+                )
                 # logger.debug("BUY {} @ {}; resp: {}", symbol, price, resp)
                 self.set_base_price(symbol, price)
 
             elif price > self.get_price_upper(symbol):
-                resp = api.order_market(symbol, qoc.api.OrderSide.SELL, quantity=self.quantity)
+                resp = api.order_market(
+                    symbol, qoc.api.OrderSide.SELL, quantity=self.quantity
+                )
                 # logger.debug("SELL {} @ {}; resp: {}", symbol, price, resp)
                 self.set_base_price(symbol, price)
         # logger.info(f"CURRENT VALUE: {self.current_value}")
         self.value_array.append(self.current_value)
 
-        if 'Total' not in self.current_values:
-            self.current_values['Total'] = 0.0
-        self.current_values['Total'] = self.current_value
+        if "Total" not in self.current_values:
+            self.current_values["Total"] = 0.0
+        self.current_values["Total"] = self.current_value
 
 
 # 计算总步数
@@ -175,71 +174,77 @@ def calculate_total_steps(start_date, end_date, interval):
     """计算从开始日期到结束日期间的总步数"""
     start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    
+
     # 计算总时间范围（秒）
     total_seconds = (end - start).total_seconds()
-    
+
     # 获取每步的时间增量
     time_delta = get_time_delta(interval)
     step_seconds = time_delta.total_seconds()
-    
+
     # 计算总步数
     total_steps = int(total_seconds / step_seconds)
-    
+
     return total_steps
+
 
 # 创建一个函数来根据interval获取时间增量
 def get_time_delta(interval: str) -> datetime.timedelta:
     """根据间隔字符串返回相应的时间增量"""
     if interval == "1m":
         return datetime.timedelta(minutes=1)
-    elif interval == "5m":
+    if interval == "5m":
         return datetime.timedelta(minutes=5)
-    elif interval == "15m":
+    if interval == "15m":
         return datetime.timedelta(minutes=15)
-    elif interval == "30m":
+    if interval == "30m":
         return datetime.timedelta(minutes=30)
-    elif interval == "1h":
+    if interval == "1h":
         return datetime.timedelta(hours=1)
-    elif interval == "4h":
+    if interval == "4h":
         return datetime.timedelta(hours=4)
-    elif interval == "1d":
+    if interval == "1d":
         return datetime.timedelta(days=1)
-    else:
-        # 默认为1分钟
-        return datetime.timedelta(minutes=1)
+    # 默认为1分钟
+    return datetime.timedelta(minutes=1)
+
 
 # 在 main 函数中添加进度条
 def main(cfg: Config) -> None:
-
     api: qoc.ApiBinance | qoc.ApiOffline
 
     if cfg.online:
         api = qoc.ApiBinance.create()
     else:
-
         import shutil
-        from pathlib import Path  
+        from pathlib import Path
+
         offline_db_path = Path("strategies/grid-strategy/data/database/")
         if offline_db_path.exists():
             # logger.info(f"删除现有数据库文件夹: {offline_db_path}")
             shutil.rmtree(offline_db_path)
-        
 
-
-        from offline_fetch import fetch_for_offline
         import arcticdb as adb
+        from offline_fetch import fetch_for_offline
 
         uri = "lmdb://strategies/grid-strategy/data/database_offline/"
 
         ac = adb.Arctic(uri)
 
-        qoc_library = ac.get_library('market', create_if_missing=True)
+        qoc_library = ac.get_library("market", create_if_missing=True)
 
-        fetch_for_offline(cfg.symbols, cfg.interval, cfg.start_date, cfg.end_date, cfg.output_dir, qoc_library)
+        fetch_for_offline(
+            cfg.symbols,
+            cfg.interval,
+            cfg.start_date,
+            cfg.end_date,
+            cfg.output_dir,
+            qoc_library,
+        )
 
-        api = qoc.ApiOffline.create(qoc_library, cfg.transaction_fee ,cfg.symbols, cfg.start_date, cfg.end_date)
-        
+        api = qoc.ApiOffline.create(
+            qoc_library, cfg.transaction_fee, cfg.symbols, cfg.start_date, cfg.end_date
+        )
 
     db = qoc.Database(uri=cfg.db)
     market = qoc.Market(
@@ -257,14 +262,16 @@ def main(cfg: Config) -> None:
 
     # 计算总步数
     total_steps = calculate_total_steps(cfg.start_date, cfg.end_date, cfg.interval)
-    
-    
+
     # 获取适当的时间增量
-    time_delta = get_time_delta(cfg.interval) if not cfg.online else datetime.timedelta(seconds=0.1)
-    
+    time_delta = (
+        get_time_delta(cfg.interval)
+        if not cfg.online
+        else datetime.timedelta(seconds=0.1)
+    )
+
     # 创建进度条
     with tqdm(total=total_steps, desc="回测进度", unit="步") as pbar:
-        
         # 跟踪已处理的步数
         step_count = 0
 
@@ -275,25 +282,26 @@ def main(cfg: Config) -> None:
             interval=datetime.timedelta(seconds=0.1), offline=not cfg.online
         ):
             ts = now if cfg.online else now_ts
-            # 执行回测逻辑    
+            # 执行回测逻辑
             end_now = api.step()  # 确保调用了api.step()获取结束状态
-            
+
             market.step(api=api)  # get klines
             strategy.step(api=api, market=market, now=ts)
             balance.step(api=api, market=market, now=ts)
             strategy.dump(now=ts)
-            
+
             # 更新进度条
             step_count += 1
             pbar.update(1)
             pbar.set_description(f"回测时间: {ts.strftime('%Y-%m-%d %H:%M')}")
-            
+
             # 使用动态时间增量
             now_ts += time_delta
-            
+
             # 检查是否达到最大步数或回测结束
             if end_now:
                 break
+
 
 if __name__ == "__main__":
     cherries.run(main, profile="playground")

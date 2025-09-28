@@ -1,7 +1,6 @@
 import datetime
 import sys
 from collections import deque
-from typing import Dict, List, Optional, override
 
 import attrs
 import numpy as np
@@ -46,21 +45,21 @@ class StrategyRev(qoc.StrategySingleSymbol):
     current_value: float = 0.0  # 账户总价值
     current_holding: float = 0.0  # 持仓总市值
 
-    order_count: Dict[str, int] = attrs.field(factory=dict, metadata={"dump": False})
+    order_count: dict[str, int] = attrs.field(factory=dict, metadata={"dump": False})
 
-    price_history: Dict[str, deque] = attrs.field(
+    price_history: dict[str, deque] = attrs.field(
         factory=dict, metadata={"dump": False}
     )
-    order_history: Dict[str, deque] = attrs.field(
+    order_history: dict[str, deque] = attrs.field(
         factory=dict, metadata={"dump": False}
     )
-    current_holdings: Dict[str, float] = attrs.field(
+    current_holdings: dict[str, float] = attrs.field(
         factory=dict, metadata={"dump": False}
     )
 
-    value_array: List[float] = attrs.field(factory=list, metadata={"dump": False})
-    holding_array: List[float] = attrs.field(factory=list, metadata={"dump": False})
-    current_values: Dict[str, float] = attrs.field(
+    value_array: list[float] = attrs.field(factory=list, metadata={"dump": False})
+    holding_array: list[float] = attrs.field(factory=list, metadata={"dump": False})
+    current_values: dict[str, float] = attrs.field(
         factory=dict, metadata={"dump": False}
     )
 
@@ -211,21 +210,20 @@ def get_time_delta(interval: str) -> datetime.timedelta:
     """根据间隔字符串返回相应的时间增量"""
     if interval == "1m":
         return datetime.timedelta(minutes=1)
-    elif interval == "5m":
+    if interval == "5m":
         return datetime.timedelta(minutes=5)
-    elif interval == "15m":
+    if interval == "15m":
         return datetime.timedelta(minutes=15)
-    elif interval == "30m":
+    if interval == "30m":
         return datetime.timedelta(minutes=30)
-    elif interval == "1h":
+    if interval == "1h":
         return datetime.timedelta(hours=1)
-    elif interval == "4h":
+    if interval == "4h":
         return datetime.timedelta(hours=4)
-    elif interval == "1d":
+    if interval == "1d":
         return datetime.timedelta(days=1)
-    else:
-        # 默认为1分钟
-        return datetime.timedelta(minutes=1)
+    # 默认为1分钟
+    return datetime.timedelta(minutes=1)
 
 
 # 在 main 函数中添加进度条

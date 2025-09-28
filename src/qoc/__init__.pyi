@@ -1,6 +1,6 @@
 from . import api, backtest, balance, feature, market, struct, timeline, utils
 from ._version import __version__, __version_tuple__, version, version_tuple
-from .api import ApiBinance, Interval, ApiOffline
+from .api import ApiBinance, ApiOffline, Interval
 from .balance import Balance
 from .database import Database, Library
 from .market import Market

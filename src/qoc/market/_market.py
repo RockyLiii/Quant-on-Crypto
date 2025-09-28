@@ -1,7 +1,4 @@
 from collections.abc import Sequence
-from typing import Any
-
-import datetime
 
 import attrs
 import pandas as pd
@@ -23,7 +20,7 @@ class Market:
         price: float = df["close"].iloc[-1]
         return qty * price
 
-    def step(self, api: api.ApiBinance|api.ApiOffline) -> None:
+    def step(self, api: api.ApiBinance | api.ApiOffline) -> None:
         for symbol in self.symbols:
             klines: pl.DataFrame = api.klines(symbol, self.interval)
             # ic(klines)
@@ -34,4 +31,3 @@ class Market:
         self, symbol: str, n: int = 5, columns: Sequence[str] | None = None
     ) -> pd.DataFrame:
         return self.library.tail(symbol, n=n, columns=columns)
-
