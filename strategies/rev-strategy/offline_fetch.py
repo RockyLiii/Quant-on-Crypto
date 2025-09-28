@@ -422,8 +422,8 @@ def fetch_for_offline(coins, interval, start_date, end_date, output_dir, library
             print("\n合并后数据预览:")
             print(combined_df.head(5))
         else:
-            print(f"⚠️ 没有新数据下载，保持现有数据不变")
-    
+            print("⚠️ 没有新数据下载，保持现有数据不变")
+
     # timestamps = get_all_timestamps_in_range(library, coins, interval, start_date, end_date)
     # return timestamps
 

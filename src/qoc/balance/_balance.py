@@ -1,4 +1,3 @@
-import collections
 from datetime import datetime
 
 import attrs
@@ -13,7 +12,12 @@ class Balance:
     library: database.Library = attrs.field()
     symbols: list[str] = attrs.field(factory=list)
 
-    def step(self, api: _api.ApiBinance|_api.ApiOffline, market: market.Market, now: datetime) -> None:
+    def step(
+        self,
+        api: _api.ApiBinance | _api.ApiOffline,
+        market: market.Market,
+        now: datetime,
+    ) -> None:
         account: _api.Account = api.account()
         balances_dict: dict[str, float] = {
             b.asset: b.free + b.locked for b in account.balances
@@ -21,8 +25,6 @@ class Balance:
         balances_df: pl.DataFrame = pl.from_dicts([balances_dict])
         balances_df = utils.insert_time(balances_df, now)
         self.library.append("balance", balances_df)
-
-            
 
         # quote_dict: dict[str, float] = collections.defaultdict(lambda: 0.0)
         # exchange_info: _api.ExchangeInfo = api.exchange_info(symbols=self.symbols)

@@ -255,8 +255,10 @@ poetry.toml
 # End of https://www.toptal.com/developers/gitignore/api/data,images,python
 
 _version.py
+.cherries/
 .DS_Store
+*.log
+*.log.*
 data/
 log.txt
 playground/
-.cherries/

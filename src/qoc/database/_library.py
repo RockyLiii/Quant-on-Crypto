@@ -1,4 +1,3 @@
-import datetime
 from collections.abc import Iterable, Sequence
 from typing import cast
 
@@ -6,7 +5,6 @@ import arcticdb as adb
 import attrs
 import pandas as pd
 import polars as pl
-from liblaf import grapes
 
 from qoc.database._types import TimeTypes
 
@@ -46,8 +44,8 @@ class Library:
             "pd.DataFrame", self.library.tail(symbol=symbol, n=1).data
         )
 
-        latest_index = data.index[-1] 
-        
+        latest_index = data.index[-1]
+
         return latest_index
 
     def has_symbol(self, symbol: str, /) -> bool:
@@ -77,7 +75,7 @@ class Library:
     ) -> pd.DataFrame:
         return cast(
             "pd.DataFrame",
-            self.library.tail(symbol=symbol, n=n, columns=columns).data,  
+            self.library.tail(symbol=symbol, n=n, columns=columns).data,
         )
 
     def _normalize_data(self, data: NormalizableType) -> pd.DataFrame:
