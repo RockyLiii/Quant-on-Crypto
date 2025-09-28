@@ -3,25 +3,58 @@ import datetime
 
 import polars as pl
 
-from .typing import Account, Interval, OrderResponseFull, OrderSideLike
+from .typing import (
+    Account,
+    ExchangeInfo,
+    Interval,
+    OrderResponseFull,
+    OrderSideLike,
+    OrderTypeLike,
+)
 
 
 class TradingApi(abc.ABC):
-    @abc.abstractmethod
-    def account(self, **kwargs) -> Account:
+    # region General
+
+    def ping(self) -> None:
+        return None
+
+    def step(self) -> bool:
+        return False
+
+    def exchange_info(
+        self,
+        symbol: str | None = None,
+        symbols: list[str] | None = None,
+        permissions: list[str] | None = None,
+    ) -> ExchangeInfo:
         raise NotImplementedError
 
-    @abc.abstractmethod
+    # endregion General
+
+    # region Market Data
+
     def klines(
         self,
         symbol: str,
         interval: Interval,
         *,
-        start_time: datetime.datetime | None = None,
+        startTime: datetime.datetime | None = None,
+        endTime: datetime.datetime | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         raise NotImplementedError
 
+    # endregion Market Data
+
+    # region Trading
+
+    def order(
+        self, symbol: str, side: OrderSideLike, type_: OrderTypeLike, **kwargs
+    ) -> OrderResponseFull:
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def order_market(
         self,
         symbol: str,
@@ -32,3 +65,12 @@ class TradingApi(abc.ABC):
         **kwargs,
     ) -> OrderResponseFull:
         raise NotImplementedError
+
+    # endregion Trading
+
+    # region Account
+
+    def account(self, **kwargs) -> Account:
+        raise NotImplementedError
+
+    # endregion Account

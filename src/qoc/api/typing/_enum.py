@@ -4,7 +4,7 @@ from typing import Literal
 from qoc import utils
 
 
-class OrderType(utils.CaseInsensitiveEnum):
+class OrderType(utils.UppercaseEnum):
     LIMIT = enum.auto()
     MARKET = enum.auto()
     STOP_LOSS = enum.auto()
@@ -28,7 +28,7 @@ type OrderTypeLike = (
 )
 
 
-class OrderSide(utils.CaseInsensitiveEnum):
+class OrderSide(utils.UppercaseEnum):
     BUY = enum.auto()
     SELL = enum.auto()
 

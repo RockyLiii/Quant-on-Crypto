@@ -1,3 +1,4 @@
+import contextvars
 import datetime
 import enum
 import itertools
@@ -5,8 +6,21 @@ import time
 from collections.abc import Generator
 from typing import Literal
 
+import pendulum
 from liblaf import grapes
 from loguru import logger
+
+from qoc.error import UnreachableError
+
+
+class Mode(enum.StrEnum):
+    OFFLINE = enum.auto()
+    ONLINE = enum.auto()
+
+
+_mode: contextvars.ContextVar[Mode] = contextvars.ContextVar(
+    "mode", default=Mode.ONLINE
+)
 
 
 class Snap(enum.StrEnum):
@@ -64,6 +78,16 @@ def clock(
         time.sleep(sleep_for)
         logger.debug("clock tick: {}", tick.isoformat())
         yield tick
+
+
+def now() -> pendulum.DateTime:
+    match _mode.get():
+        case Mode.OFFLINE:
+            raise NotImplementedError("TODO(liblaf): handle offline mode")
+        case Mode.ONLINE:
+            return pendulum.now(tz="UTC")
+        case _:
+            raise UnreachableError
 
 
 def _ticks(
