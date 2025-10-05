@@ -10,7 +10,7 @@ from . import (
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
-from .api import ApiBinance, ApiOffline
+from .api import ApiBinance, ApiBinanceSpot, ApiOffline
 from .balance import Balance
 from .database import Database, Library
 from .market import Market
@@ -20,7 +20,7 @@ from .time_utils import (
     Interval,
     IntervalLike,
     IntervalUnit,
-    TimestampUnit,
+    TimeUnit,
     as_datetime,
     clock,
     datetime_to_index_ceil,
@@ -39,6 +39,7 @@ from .utils import (
 
 __all__ = [
     "ApiBinance",
+    "ApiBinanceSpot",
     "ApiOffline",
     "Balance",
     "Database",
@@ -50,7 +51,7 @@ __all__ = [
     "Market",
     "Strategy",
     "StrategySingleSymbol",
-    "TimestampUnit",
+    "TimeUnit",
     "UppercaseEnum",
     "__version__",
     "__version_tuple__",

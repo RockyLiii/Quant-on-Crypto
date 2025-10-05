@@ -1,3 +1,4 @@
+import functools
 from typing import Any
 
 import attrs
@@ -7,6 +8,8 @@ import polars as pl
 from environs import env
 from loguru import logger
 
+import qoc.time_utils as tu
+from qoc.api.binance._utils import get_time_unit
 from qoc.api.typing import (
     Account,
     ExchangeInfo,
@@ -18,13 +21,12 @@ from qoc.api.typing import (
     OrderTypeLike,
     Symbol,
 )
-from qoc.time_utils import DateTimeLike
 
-from ._klines import KlinesMixin
+from ._klines import KLines
 
 
 @attrs.define
-class ApiBinanceSpot(KlinesMixin):
+class ApiBinanceSpot:
     client: binance.spot.Spot
     _cache_klines: cachetools.Cache[tuple[Symbol, Interval], pl.DataFrame] = (
         attrs.field(factory=lambda: cachetools.LRUCache(maxsize=1024))
@@ -45,6 +47,10 @@ class ApiBinanceSpot(KlinesMixin):
             kwargs["base_url"] = env.str("BINANCE_BASE_URL", None)
         client = binance.spot.Spot(api_key=api_key, api_secret=api_secret, **kwargs)
         self.__attrs_init__(client=client)  # pyright: ignore[reportAttributeAccessIssue]
+
+    @property
+    def time_unit(self) -> tu.TimeUnit:
+        return get_time_unit(self.client)
 
     # region General
 
@@ -71,18 +77,9 @@ class ApiBinanceSpot(KlinesMixin):
 
     # region Market Data
 
-    def klines(
-        self,
-        symbol: str,
-        interval: Interval,
-        *,
-        startTime: DateTimeLike | None = None,
-        endTime: DateTimeLike | None = None,
-        **kwargs,
-    ) -> pl.DataFrame:
-        return super().klines(
-            symbol, interval, startTime=startTime, endTime=endTime, **kwargs
-        )
+    @functools.cached_property
+    def klines(self) -> KLines:
+        return KLines(client=self.client)
 
     # endregion Market Data
 

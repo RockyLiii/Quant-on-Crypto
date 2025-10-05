@@ -44,6 +44,24 @@ class Interval:
         return cls(count=count, unit=unit)
 
     @property
+    def duration(self) -> pendulum.Duration:
+        match self.unit:
+            case IntervalUnit.MONTHS:
+                return pendulum.duration(months=self.count)
+            case IntervalUnit.WEEKS:
+                return pendulum.duration(weeks=self.count)
+            case IntervalUnit.DAYS:
+                return pendulum.duration(days=self.count)
+            case IntervalUnit.HOURS:
+                return pendulum.duration(hours=self.count)
+            case IntervalUnit.MINUTES:
+                return pendulum.duration(minutes=self.count)
+            case IntervalUnit.SECONDS:
+                return pendulum.duration(seconds=self.count)
+            case _:
+                raise grapes.MatchError(self.unit)
+
+    @property
     def zero(self) -> pendulum.DateTime:
         # Monday, aligned with 3d interval
         return pendulum.datetime(year=2001, month=1, day=1)

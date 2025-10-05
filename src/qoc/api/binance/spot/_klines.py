@@ -1,152 +1,130 @@
-from collections.abc import Generator, Hashable
+import math
 from typing import Any
 
 import attrs
+import binance.spot
 import cachetools
-import cachetools.keys
 import pendulum
 import polars as pl
 from loguru import logger
+from polars._typing import SchemaDefinition
 
 import qoc.time_utils as tu
+from qoc.api.binance._utils import get_time_unit
 from qoc.api.typing import Interval, Symbol
 from qoc.time_utils import DateTimeLike
-
-from ._base import ApiBinanceSpotBase
-
-API_LIMIT_MAX: int = 1000
 
 
 @attrs.frozen
 class CacheKey:
     symbol: Symbol
     interval: Interval
-    start_time: pendulum.DateTime
-    end_time: pendulum.DateTime
+    start_time: tu.DateTimeLike
+    end_time: tu.DateTimeLike
+
+    def __str__(self) -> str:
+        return f"{self.symbol} ({self.interval}) {self.start_time} - {self.end_time}"
 
 
 @attrs.define
-class KlinesMixin(ApiBinanceSpotBase):
-    _cache_klines: cachetools.Cache[Any, pl.DataFrame] = attrs.field(
+class KLines:
+    client: binance.spot.Spot
+    cache: cachetools.Cache[CacheKey, pl.DataFrame] = attrs.field(
         factory=lambda: cachetools.LRUCache(maxsize=1024)
     )
+    limit: int = 1000
 
-    def klines(
+    def __call__(
         self,
-        symbol: str,
+        symbol: Symbol,
         interval: Interval,
-        *,
         startTime: DateTimeLike | None = None,
         endTime: DateTimeLike | None = None,
         **kwargs,
     ) -> pl.DataFrame:
-        endTime = tu.as_datetime(endTime) if endTime is not None else pendulum.now()
-        interval_duration: pendulum.Duration = tu.as_duration(interval)
-        startTime = (
-            tu.as_datetime(startTime)
-            if startTime is not None
-            else endTime - API_LIMIT_MAX * interval_duration
-        )
-        data: pl.DataFrame = pl.concat(
-            self._klines(
+        interval_parsed: tu.Interval = tu.Interval.parse(interval)
+        endTime = tu.now() if endTime is None else tu.as_datetime(endTime)
+        if startTime is None:
+            startTime = endTime - (self.limit / 2) * interval_parsed.duration
+        else:
+            startTime = tu.as_datetime(startTime)
+
+        chunks: list[pl.DataFrame] = []
+        start_time_index: int = tu.datetime_to_index_floor(startTime, interval)
+        end_time_index: int = tu.datetime_to_index_ceil(endTime, interval)
+        start_chunk_index: int = (start_time_index // self.limit) * self.limit
+        end_chunk_index: int = math.ceil(end_time_index / self.limit) * self.limit
+        for chunk_index in range(start_chunk_index, end_chunk_index, self.limit):
+            chunk_start_time: pendulum.DateTime = tu.index_to_datetime(
+                chunk_index, interval
+            )
+            chunk_end_time: pendulum.DateTime = tu.index_to_datetime(
+                chunk_index + self.limit, interval
+            )
+            delta: pl.DataFrame = self._klines(
                 symbol,
                 interval,
-                start_time=chunk.start_time,
-                end_time=chunk.end_time,
+                start_time=chunk_start_time,
+                end_time=chunk_end_time,
                 **kwargs,
             )
-            for chunk in _generate_kline_chunks(symbol, interval, startTime, endTime)
+            if not delta.is_empty():
+                chunks.append(delta)
+        data: pl.DataFrame = pl.concat(chunks)
+        data = data.filter(
+            (pl.col("open_time") >= startTime) & (pl.col("open_time") <= endTime)
         )
-        # data = data.filter(
-        #     (pl.col("open_time") >= startTime) & (pl.col("open_time") <= endTime)
-        # )
         return data
+
+    @property
+    def schema(self) -> SchemaDefinition:
+        datetime_schema = pl.Datetime(
+            time_unit=self.time_unit.polars_time_unit, time_zone=pendulum.UTC
+        )
+        return [
+            ("open_time", datetime_schema),
+            ("open", pl.Float64),
+            ("high", pl.Float64),
+            ("low", pl.Float64),
+            ("close", pl.Float64),
+            ("volume", pl.Float64),
+            ("close_time", datetime_schema),
+            ("quote_asset_volume", pl.Float64),
+            ("number_of_trades", pl.Int64),
+            ("taker_buy_base_asset_volume", pl.Float64),
+            ("taker_buy_quote_asset_volume", pl.Float64),
+            ("ignore", pl.String),
+        ]
+
+    @property
+    def time_unit(self) -> tu.TimeUnit:
+        return get_time_unit(self.client)
 
     def _klines(
         self,
-        symbol: str,
+        symbol: Symbol,
         interval: Interval,
-        *,
         start_time: pendulum.DateTime,
         end_time: pendulum.DateTime,
         **kwargs,
     ) -> pl.DataFrame:
-        kwargs["limit"] = API_LIMIT_MAX
-        key: Hashable = cachetools.keys.methodkey(
-            self, symbol, interval, start_time, end_time, **kwargs
+        key = CacheKey(symbol, interval, start_time, end_time)
+        if key in self.cache:
+            logger.trace("klines cache hit: {}", key)
+            return self.cache[key]
+        logger.trace("klines cache miss: {}", key)
+        raw: list[list[Any]] = self.client.klines(
+            symbol=symbol,
+            interval=interval,
+            startTime=math.floor(tu.as_timestamp(start_time, unit=self.time_unit)),
+            endTime=math.ceil(tu.as_timestamp(end_time, unit=self.time_unit)),
+            limit=self.limit,
+            **kwargs,
         )
-        if key in self._cache_klines:
-            logger.debug(
-                "klines() cache hit: {}, {}, {} - {}",
-                symbol,
-                interval,
-                start_time,
-                end_time,
-            )
-            return self._cache_klines[key]
-        logger.debug(
-            "klines() cache miss: {}, {}, {} - {}",
-            symbol,
-            interval,
-            start_time,
-            end_time,
-        )
-        kwargs["startTime"] = self.time_unit.as_int_timestamp(start_time)
-        kwargs["endTime"] = self.time_unit.as_int_timestamp(end_time)
-        raw: list[list[Any]] = self.client.klines(symbol, interval, **kwargs)
-        data: pl.DataFrame = pl.from_records(
-            raw,
-            [
-                (
-                    "open_time",
-                    pl.Datetime(self.time_unit.polars_time_unit, pendulum.UTC),
-                ),
-                ("open", pl.Float64),
-                ("high", pl.Float64),
-                ("low", pl.Float64),
-                ("close", pl.Float64),
-                ("volume", pl.Float64),
-                (
-                    "close_time",
-                    pl.Datetime(self.time_unit.polars_time_unit, pendulum.UTC),
-                ),
-                ("quote_asset_volume", pl.Float64),
-                ("number_of_trades", pl.Int64),
-                ("taker_buy_base_asset_volume", pl.Float64),
-                ("taker_buy_quote_asset_volume", pl.Float64),
-                ("ignore", pl.String),
-            ],
-            orient="row",
-        )
-        if data.height == API_LIMIT_MAX:
-            logger.debug(
-                "klines() fetched data height == API_LIMIT_MAX: {}, {}, {} - {}",
-                symbol,
-                interval,
-                start_time,
-                end_time,
-            )
-            self._cache_klines[key] = data
-        else:
-            logger.debug(
-                "klines() fetched data height < API_LIMIT_MAX: {}, {}, {} - {}",
-                symbol,
-                interval,
-                start_time,
-                end_time,
-            )
+        data: pl.DataFrame = pl.from_records(raw, schema=self.schema, orient="row")
+        if data.is_empty():
+            return data
+        interval_parsed: tu.Interval = tu.Interval.parse(interval)
+        if data["close_time"][-1] + interval_parsed.duration > end_time:
+            self.cache[key] = data
         return data
-
-
-def _generate_kline_chunks(
-    symbol: str,
-    interval: Interval,
-    start_time: pendulum.DateTime,
-    end_time: pendulum.DateTime,
-) -> Generator[CacheKey]:
-    interval_duration: pendulum.Duration = tu.as_duration(interval)
-    chunk_start: pendulum.DateTime = tu.datetime_floor(start_time, interval)
-    while chunk_start < end_time:
-        chunk_end: pendulum.DateTime = chunk_start + API_LIMIT_MAX * interval_duration
-        yield CacheKey(symbol, interval, chunk_start, chunk_end)
-        chunk_start = chunk_end
