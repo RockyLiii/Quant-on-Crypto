@@ -112,6 +112,7 @@ class ApiBinanceSpot:
         quoteOrderQty: float | str | None = None,
         **kwargs,
     ) -> OrderResponseFull:
+        # TODO(liblaf): round quantity according to LOT_SIZE filter
         if quantity is not None:
             kwargs["quantity"] = _as_str(quantity)
         if quoteOrderQty is not None:
