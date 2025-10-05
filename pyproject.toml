@@ -38,6 +38,7 @@ dependencies = [
   "pandas>=2,<3",
   "pendulum>=3,<4",
   "polars[pyarrow]>=1,<2",
+  "pydantic-extra-types[pendulum]>=2.10.5",
   "pyyaml>=6,<7",
   "requests>=2,<3",
   "scikit-learn>=1,<2",

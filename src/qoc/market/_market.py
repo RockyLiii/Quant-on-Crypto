@@ -20,7 +20,7 @@ class Market:
         price: float = df["close"].iloc[-1]
         return qty * price
 
-    def step(self, api: api.ApiBinance | api.ApiOffline) -> None:
+    def step(self, api: api.ApiBinanceSpot | api.ApiOffline) -> None:
         for symbol in self.symbols:
             klines: pl.DataFrame = api.klines(symbol, self.interval)
             # ic(klines)

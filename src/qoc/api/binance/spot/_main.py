@@ -129,4 +129,4 @@ class ApiBinanceSpot:
 
 
 def _as_str(obj: str | float) -> str:
-    return str(obj)
+    return f"{obj:f}"
