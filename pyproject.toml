@@ -27,14 +27,16 @@ classifiers = [
 dependencies = [
   "arcticdb>=6,<7",
   "binance-connector>=3,<4",
+  "cachetools>=5,<6",
   "jaxtyping>=0.3,<0.4",
   "lazy-loader>=0.4,<0.5",
-  "liblaf-cherries>=0.4.1",
-  "liblaf-grapes>=2,<3",
+  "liblaf-cherries>=0.5,<0.6",
+  "liblaf-grapes>=4,<5",
   "loguru>=0.7,<0.8",
   "matplotlib>=3,<4",
   "numpy>=2,<3",
   "pandas>=2,<3",
+  "pendulum>=3,<4",
   "polars[pyarrow]>=1,<2",
   "pyyaml>=6,<7",
   "requests>=2,<3",
@@ -102,7 +104,7 @@ testpaths = ["benches", "src", "tests"]
 extend = ".config/linters/.ruff.toml"
 
 [tool.ruff.lint]
-ignore = ["F722", "N803"]
+ignore = ["EM101", "F722", "N803", "N806"]
 
 [tool.uv]
 default-groups = "all"

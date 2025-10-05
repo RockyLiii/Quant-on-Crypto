@@ -36,8 +36,6 @@ class Config(cherries.BaseConfig):
     limit_order_time: int = 3  # minutes
 
 
-
-
 @attrs.define
 class StrategyGrid(qoc.StrategySingleSymbol):
     # ===== Config =====
