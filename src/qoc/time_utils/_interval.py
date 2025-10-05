@@ -5,7 +5,7 @@ import attrs
 import pendulum
 from liblaf import grapes
 
-from qoc.time_utils._datetime import DateTimeLike, as_datetime
+from ._datetime import DateTimeLike, as_datetime
 
 type IntervalLike = str | Interval
 

@@ -1,15 +1,15 @@
 import functools
-from typing import Any
+from typing import Any, override
 
 import attrs
 import binance.spot
-import cachetools
 import polars as pl
 from environs import env
 from loguru import logger
 from typing_extensions import deprecated
 
 import qoc.time_utils as tu
+from qoc.api._abc import AbstractApi
 from qoc.api.binance._utils import get_time_unit
 from qoc.api.typing import (
     Account,
@@ -22,16 +22,14 @@ from qoc.api.typing import (
     OrderTypeLike,
     Symbol,
 )
+from qoc.time_utils import DateTimeLike
 
 from ._klines import KLines
 
 
 @attrs.define
-class ApiBinanceSpot:
+class ApiBinanceSpot(AbstractApi):
     client: binance.spot.Spot
-    _cache_klines: cachetools.Cache[tuple[Symbol, Interval], pl.DataFrame] = (
-        attrs.field(factory=lambda: cachetools.LRUCache(maxsize=1024))
-    )
 
     def __init__(
         self,
@@ -55,17 +53,21 @@ class ApiBinanceSpot:
 
     # region General
 
+    @override
     def ping(self) -> None:
         return self.client.ping()
 
+    @override
     def step(self) -> bool:
         return False
 
+    @override
     def exchange_info(
         self,
-        symbol: str | None = None,
-        symbols: list[str] | None = None,
+        symbol: Symbol | None = None,
+        symbols: list[Symbol] | None = None,
         permissions: list[str] | None = None,
+        **kwargs,
     ) -> ExchangeInfo:
         raw: Any = self.client.exchange_info(
             symbol=symbol,  # pyright: ignore[reportArgumentType]
@@ -78,14 +80,32 @@ class ApiBinanceSpot:
 
     # region Market Data
 
+    @override
+    def klines(
+        self,
+        symbol: Symbol,
+        interval: Interval,
+        startTime: DateTimeLike | None = None,
+        endTime: DateTimeLike | None = None,
+        **kwargs,
+    ) -> pl.DataFrame:
+        return self._klines(
+            symbol=symbol,
+            interval=interval,
+            startTime=startTime,
+            endTime=endTime,
+            **kwargs,
+        )
+
     @functools.cached_property
-    def klines(self) -> KLines:
+    def _klines(self) -> KLines:
         return KLines(client=self.client)
 
     # endregion Market Data
 
     # region Trading
 
+    @override
     def order(
         self, symbol: str, side: OrderSideLike, type_: OrderTypeLike, **kwargs
     ) -> OrderResponseFull:
@@ -103,6 +123,7 @@ class ApiBinanceSpot:
         logger.info(response)
         return response
 
+    @override
     def order_market(
         self,
         symbol: str,
@@ -114,15 +135,16 @@ class ApiBinanceSpot:
     ) -> OrderResponseFull:
         # TODO(liblaf): round quantity according to LOT_SIZE filter
         if quantity is not None:
-            kwargs["quantity"] = _as_str(quantity)
+            kwargs["quantity"] = _format_float(quantity)
         if quoteOrderQty is not None:
-            kwargs["quoteOrderQty"] = _as_str(quoteOrderQty)
+            kwargs["quoteOrderQty"] = _format_float(quoteOrderQty)
         return self.order(symbol, side, OrderType.MARKET, **kwargs)
 
     # endregion Trading
 
     # region Account
 
+    @override
     def account(self, **kwargs) -> Account:
         raw: dict = self.client.account(**kwargs)
         return Account.model_validate(raw)
@@ -130,7 +152,7 @@ class ApiBinanceSpot:
     # endregion Account
 
 
-def _as_str(obj: str | float) -> str:
+def _format_float(obj: str | float) -> str:
     return f"{obj:f}"
 
 

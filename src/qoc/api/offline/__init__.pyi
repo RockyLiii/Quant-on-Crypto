@@ -1,3 +1,3 @@
-from ._offline import ApiOffline
+from ._offline_old import ApiOffline
 
 __all__ = ["ApiOffline"]

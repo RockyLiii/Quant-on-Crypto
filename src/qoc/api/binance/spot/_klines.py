@@ -28,6 +28,12 @@ class CacheKey:
 
 @attrs.define
 class KLines:
+    """.
+
+    References:
+        1. <https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints#klinecandlestick-data>
+    """
+
     client: binance.spot.Spot
     cache: cachetools.Cache[CacheKey, pl.DataFrame] = attrs.field(
         factory=lambda: cachetools.LRUCache(maxsize=1024)
