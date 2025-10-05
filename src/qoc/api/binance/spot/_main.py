@@ -7,6 +7,7 @@ import cachetools
 import polars as pl
 from environs import env
 from loguru import logger
+from typing_extensions import deprecated
 
 import qoc.time_utils as tu
 from qoc.api.binance._utils import get_time_unit
@@ -130,3 +131,7 @@ class ApiBinanceSpot:
 
 def _as_str(obj: str | float) -> str:
     return f"{obj:f}"
+
+
+@deprecated("Use `ApiBinanceSpot` instead.")
+class ApiBinance(ApiBinanceSpot): ...

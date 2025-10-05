@@ -1,4 +1,4 @@
 from ._utils import get_time_unit
-from .spot import ApiBinanceSpot
+from .spot import ApiBinance, ApiBinanceSpot
 
-__all__ = ["ApiBinanceSpot", "get_time_unit"]
+__all__ = ["ApiBinance", "ApiBinanceSpot", "get_time_unit"]

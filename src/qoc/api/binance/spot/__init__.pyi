@@ -1,4 +1,4 @@
 from ._klines import KLines
-from ._main import ApiBinanceSpot
+from ._main import ApiBinance, ApiBinanceSpot
 
-__all__ = ["ApiBinanceSpot", "KLines"]
+__all__ = ["ApiBinance", "ApiBinanceSpot", "KLines"]
