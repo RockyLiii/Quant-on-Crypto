@@ -1,22 +1,25 @@
 from ._clock import clock, now
-from ._datetime import (
-    DateTimeLike,
-    DurationLike,
-    as_datetime,
-    as_duration,
-    datetime_ceil,
-    datetime_floor,
+from ._datetime import DateTimeLike, as_datetime
+from ._interval import (
+    Interval,
+    IntervalLike,
+    IntervalUnit,
+    datetime_to_index_ceil,
+    datetime_to_index_floor,
+    index_to_datetime,
 )
-from ._unit import TimeUnit
+from ._timestamp import TimestampUnit
 
 __all__ = [
     "DateTimeLike",
-    "DurationLike",
-    "TimeUnit",
+    "Interval",
+    "IntervalLike",
+    "IntervalUnit",
+    "TimestampUnit",
     "as_datetime",
-    "as_duration",
     "clock",
-    "datetime_ceil",
-    "datetime_floor",
+    "datetime_to_index_ceil",
+    "datetime_to_index_floor",
+    "index_to_datetime",
     "now",
 ]
