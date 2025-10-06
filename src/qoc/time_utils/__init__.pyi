@@ -1,22 +1,33 @@
-from ._clock import clock, now
-from ._datetime import (
-    DateTimeLike,
-    DurationLike,
-    as_datetime,
-    as_duration,
-    datetime_ceil,
-    datetime_floor,
+from ._clock import clock
+from ._datetime import DateTimeLike, as_datetime, as_timestamp
+from ._interval import (
+    Interval,
+    IntervalLike,
+    IntervalUnit,
+    datetime_to_index_ceil,
+    datetime_to_index_floor,
+    index_to_datetime,
 )
 from ._unit import TimeUnit
+from .clock import Clock, ClockOffline, ClockOnline, configure, loop, now
 
 __all__ = [
+    "Clock",
+    "ClockOffline",
+    "ClockOnline",
     "DateTimeLike",
-    "DurationLike",
+    "Interval",
+    "IntervalLike",
+    "IntervalUnit",
     "TimeUnit",
     "as_datetime",
-    "as_duration",
+    "as_timestamp",
     "clock",
-    "datetime_ceil",
-    "datetime_floor",
+    "configure",
+    "datetime_to_index_ceil",
+    "datetime_to_index_floor",
+    "index_to_datetime",
+    "loop",
+    "now",
     "now",
 ]

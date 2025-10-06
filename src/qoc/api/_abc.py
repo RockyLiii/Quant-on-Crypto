@@ -1,7 +1,9 @@
 import abc
-import datetime
 
 import polars as pl
+
+from qoc.api.typing import Symbol
+from qoc.time_utils import DateTimeLike
 
 from .typing import (
     Account,
@@ -13,7 +15,7 @@ from .typing import (
 )
 
 
-class TradingApi(abc.ABC):
+class AbstractApi(abc.ABC):
     # region General
 
     def ping(self) -> None:
@@ -24,9 +26,10 @@ class TradingApi(abc.ABC):
 
     def exchange_info(
         self,
-        symbol: str | None = None,
-        symbols: list[str] | None = None,
+        symbol: Symbol | None = None,
+        symbols: list[Symbol] | None = None,
         permissions: list[str] | None = None,
+        **kwargs,
     ) -> ExchangeInfo:
         raise NotImplementedError
 
@@ -36,11 +39,11 @@ class TradingApi(abc.ABC):
 
     def klines(
         self,
-        symbol: str,
+        symbol: Symbol,
         interval: Interval,
         *,
-        startTime: datetime.datetime | None = None,
-        endTime: datetime.datetime | None = None,
+        startTime: DateTimeLike | None = None,
+        endTime: DateTimeLike | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         raise NotImplementedError
@@ -50,14 +53,14 @@ class TradingApi(abc.ABC):
     # region Trading
 
     def order(
-        self, symbol: str, side: OrderSideLike, type_: OrderTypeLike, **kwargs
+        self, symbol: Symbol, side: OrderSideLike, type_: OrderTypeLike, **kwargs
     ) -> OrderResponseFull:
         raise NotImplementedError
 
     @abc.abstractmethod
     def order_market(
         self,
-        symbol: str,
+        symbol: Symbol,
         side: OrderSideLike,
         *,
         quantity: float | None = None,

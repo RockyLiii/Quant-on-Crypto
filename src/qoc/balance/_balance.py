@@ -14,7 +14,7 @@ class Balance:
 
     def step(
         self,
-        api: _api.ApiBinance | _api.ApiOffline,
+        api: _api.ApiBinanceSpot | _api.ApiOffline,
         market: market.Market,
         now: datetime,
     ) -> None:
