@@ -1,5 +1,5 @@
 from .binance import ApiBinance, ApiBinanceSpot
-from .offline import ApiOffline
+from .offline import ApiOffline, ApiOfflineSpot
 from .typing import (
     Account,
     ExchangeInfo,
@@ -23,6 +23,7 @@ __all__ = [
     "ApiBinance",
     "ApiBinanceSpot",
     "ApiOffline",
+    "ApiOfflineSpot",
     "ExchangeInfo",
     "ExchangeInfoSymbol",
     "Filter",

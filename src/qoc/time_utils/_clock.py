@@ -9,6 +9,7 @@ from typing import Literal
 import pendulum
 from liblaf import grapes
 from loguru import logger
+from typing_extensions import deprecated
 
 from qoc.error import UnreachableError
 
@@ -42,6 +43,7 @@ class Snap(enum.StrEnum):
 type SnapLike = Snap | Literal["none", "second"]
 
 
+@deprecated("Use `qoc.time_utils.loop()` instead")
 def clock(
     interval: datetime.timedelta = datetime.timedelta(seconds=1),
     *,
@@ -80,6 +82,7 @@ def clock(
         yield tick
 
 
+@deprecated("Use `qoc.time_utils.now()` instead")
 def now() -> pendulum.DateTime:
     match _mode.get():
         case Mode.OFFLINE:

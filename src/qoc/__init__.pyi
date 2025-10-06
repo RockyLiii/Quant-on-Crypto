@@ -10,22 +10,28 @@ from . import (
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
-from .api import ApiBinance, ApiBinanceSpot, ApiOffline
+from .api import ApiBinance, ApiBinanceSpot, ApiOffline, ApiOfflineSpot
 from .balance import Balance
 from .database import Database, Library
 from .market import Market
 from .strategy import Strategy, StrategySingleSymbol
 from .time_utils import (
+    Clock,
+    ClockOffline,
+    ClockOnline,
     DateTimeLike,
     Interval,
     IntervalLike,
     IntervalUnit,
     TimeUnit,
     as_datetime,
+    as_timestamp,
     clock,
+    configure,
     datetime_to_index_ceil,
     datetime_to_index_floor,
     index_to_datetime,
+    loop,
     now,
 )
 from .utils import (
@@ -41,7 +47,11 @@ __all__ = [
     "ApiBinance",
     "ApiBinanceSpot",
     "ApiOffline",
+    "ApiOfflineSpot",
     "Balance",
+    "Clock",
+    "ClockOffline",
+    "ClockOnline",
     "Database",
     "DateTimeLike",
     "Interval",
@@ -57,9 +67,11 @@ __all__ = [
     "__version_tuple__",
     "api",
     "as_datetime",
+    "as_timestamp",
     "backtest",
     "balance",
     "clock",
+    "configure",
     "data_dir",
     "datetime_to_index_ceil",
     "datetime_to_index_floor",
@@ -68,6 +80,7 @@ __all__ = [
     "fig_dir",
     "index_to_datetime",
     "insert_time",
+    "loop",
     "market",
     "now",
     "struct",

@@ -36,7 +36,7 @@ class KLines:
 
     client: binance.spot.Spot
     cache: cachetools.Cache[CacheKey, pl.DataFrame] = attrs.field(
-        factory=lambda: cachetools.LRUCache(maxsize=1024)
+        factory=lambda: cachetools.LRUCache(maxsize=128)
     )
     limit: int = 1000
 
@@ -49,15 +49,18 @@ class KLines:
         **kwargs,
     ) -> pl.DataFrame:
         interval_parsed: tu.Interval = tu.Interval.parse(interval)
-        endTime = tu.now() if endTime is None else tu.as_datetime(endTime)
+        end: pendulum.DateTime = (
+            tu.now() if endTime is None else tu.as_datetime(endTime)
+        )
+        start: pendulum.DateTime
         if startTime is None:
-            startTime = endTime - (self.limit / 2) * interval_parsed.duration
+            start = end - (self.limit / 2) * interval_parsed.duration
         else:
-            startTime = tu.as_datetime(startTime)
+            start = tu.as_datetime(startTime)
 
         chunks: list[pl.DataFrame] = []
-        start_time_index: int = tu.datetime_to_index_floor(startTime, interval)
-        end_time_index: int = tu.datetime_to_index_ceil(endTime, interval)
+        start_time_index: int = tu.datetime_to_index_floor(start, interval)
+        end_time_index: int = tu.datetime_to_index_ceil(end, interval)
         start_chunk_index: int = (start_time_index // self.limit) * self.limit
         end_chunk_index: int = math.ceil(end_time_index / self.limit) * self.limit
         for chunk_index in range(start_chunk_index, end_chunk_index, self.limit):
@@ -77,8 +80,9 @@ class KLines:
             if not delta.is_empty():
                 chunks.append(delta)
         data: pl.DataFrame = pl.concat(chunks)
+        data = data.drop("ignore")
         data = data.filter(
-            (pl.col("open_time") >= startTime) & (pl.col("open_time") <= endTime)
+            (pl.col("open_time") >= start) & (pl.col("open_time") <= end)
         )
         return data
 
