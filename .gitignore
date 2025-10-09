@@ -262,3 +262,7 @@ _version.py
 data/
 log.txt
 playground/
+strategies/union-strategies/union/market/lock.mdb
+strategies/union-strategies/union/_arctic_cfg/data.mdb
+strategies/union-strategies/union/market/data.mdb
+strategies/union-strategies/union/_arctic_cfg/lock.mdb
