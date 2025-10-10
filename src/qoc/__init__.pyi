@@ -1,12 +1,10 @@
 from . import (
     api,
-    backtest,
     balance,
     feature,
     market,
     struct,
     time_utils,
-    timeline,
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
@@ -68,7 +66,6 @@ __all__ = [
     "api",
     "as_datetime",
     "as_timestamp",
-    "backtest",
     "balance",
     "clock",
     "configure",
@@ -85,7 +82,6 @@ __all__ = [
     "now",
     "struct",
     "time_utils",
-    "timeline",
     "utils",
     "version",
     "version_tuple",

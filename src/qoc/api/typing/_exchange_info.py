@@ -1,7 +1,4 @@
-from typing import cast
-
-from qoc.api.typing import BaseModel
-
+from ._base_model import BaseModel
 from ._filters import Filter, FilterType, FilterTypeLike, LotSize, MinNotional, Notional
 
 
@@ -21,15 +18,15 @@ class ExchangeInfoSymbol(BaseModel):
 
     @property
     def lot_size(self) -> LotSize | None:
-        return cast("LotSize | None", self.get_filter(FilterType.LOT_SIZE))
+        return self.get_filter(FilterType.LOT_SIZE)  # pyright: ignore[reportReturnType]
 
     @property
     def min_notional(self) -> MinNotional | None:
-        return cast("MinNotional | None", self.get_filter(FilterType.MIN_NOTIONAL))
+        return self.get_filter(FilterType.MIN_NOTIONAL)  # pyright: ignore[reportReturnType]
 
     @property
     def notional(self) -> Notional | None:
-        return cast("Notional | None", self.get_filter(FilterType.NOTIONAL))
+        return self.get_filter(FilterType.NOTIONAL)  # pyright: ignore[reportReturnType]
 
     # endregion Filters
 

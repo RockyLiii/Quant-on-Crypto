@@ -14,45 +14,162 @@ ignorePaths:
 ignoreRandomStrings: true
 useGitignore: true
 words:
+  - annot
   - apng
   - arcticdb
   - arithmatex
   - axhline
+  - axvline
+  - axvspan
+  - bfill
   - bome
-  - corrs
+  - byday
+  - byhour
+  - cbar
+  - ccfedabc
+  - clientorderid
+  - cmap
+  - coef
+  - coefs
+  - corrcoef
+  - csvlib
   - cummulative
+  - cummulativequoteqty
   - cython
+  - deque
+  - deri
   - direnv
   - dmypy
+  - dropna
+  - dtype
+  - dymusdt
+  - elif
   - elon
-  - ewma
+  - ename
+  - evalue
+  - ffill
   - fieldz
+  - fillna
   - getattr
+  - groupby
   - hmstr
+  - httpx
   - hynek
+  - iloc
   - inlinehilite
+  - inplace
+  - ioargs
+  - ipykernel
   - ipynb
   - ipython
-  - isin
+  - isinstance
+  - isnan
+  - iterrows
   - jaxtyping
   - jfif
+  - jupusdt
   - klines
+  - kwargs
+  - kwds
   - liblaf
   - liii
   - lizeyu
+  - lmdb
+  - macd
+  - magausdt
+  - mand
+  - margs
   - marketsimu
+  - mblue
+  - mcheck
+  - mchunksize
+  - mcolumns
+  - mcompression
+  - mdate
+  - mdecimal
+  - mdef
+  - mdeprecate
+  - mdoublequote
+  - mdtype
+  - melif
+  - melse
+  - mengine
+  - merrors
+  - mfilepath
+  - mfind
+  - mfmt
+  - mfor
+  - mformat
+  - mget
+  - mgreen
+  - mhandle
+  - mhandles
+  - mhas
+  - mheader
+  - mindex
+  - mioargs
+  - misinstance
   - mkdocs
   - mkdocstrings
+  - mkwargs
+  - mkwds
+  - mlen
+  - mlineterminator
+  - mlistdir
+  - mlower
+  - mmemory
+  - mmode
+  - mmpair
+  - mnames
+  - mnot
+  - mopen
+  - moptions
+  - mparent
+  - mpath
+  - mplot
+  - mpurple
+  - mquotechar
+  - mquoting
+  - mraise
+  - mread
+  - mrest
+  - mreturn
+  - msave
+  - mself
+  - msep
+  - mstorage
+  - mstr
+  - mstrict
+  - msuffix
+  - msymbol
+  - mtitle
+  - mupdate
+  - mutf
+  - mwarn
+  - mwith
+  - mwriter
+  - mxlabel
+  - myield
   - mypy
+  - mzstd
+  - nbconvert
+  - nbformat
   - ndarray
   - neiro
+  - notna
+  - notusdt
+  - nrows
   - numprocesses
   - numpy
+  - opusdt
+  - pbar
   - pengu
   - penguusdt
   - pipenv
   - pixi
+  - pnls
   - pnut
+  - polusdt
   - pyarrow
   - pybuilder
   - pycache
@@ -60,11 +177,12 @@ words:
   - pydocstyle
   - pyenv
   - pyflow
+  - pygments
+  - pylabtools
   - pylint
   - pymdownx
   - pypa
   - pypackages
-  - pypi
   - pyplot
   - pyproject
   - pyright
@@ -74,16 +192,41 @@ words:
   - pyvenv
   - pyvista
   - pyyaml
+  - qbyhwf
+  - renderusdt
+  - resi
+  - rmtree
+  - rsts
+  - satoshiusdt
   - scipy
   - scrapy
   - sdist
+  - sharey
+  - shutil
+  - sklearn
+  - spxusdt
+  - strat
   - svgz
+  - thres
+  - tolist
   - tombi
+  - topk
   - tqdm
+  - tradeid
   - trimesh
+  - trumpusdt
+  - tsmom
   - twinx
+  - ufeff
   - venv
+  - vstack
+  - vwap
+  - vwaps
   - webp
+  - xdata
   - xlabel
+  - xticklabels
   - xticks
   - ylabel
+  - ylim
+  - yticklabels

@@ -16,7 +16,7 @@ from qoc.time_utils import DateTimeLike
 
 
 @attrs.define
-class KLines:
+class ApiOfflineSpotKlines:
     cache: cachetools.Cache[Any, pl.DataFrame] = attrs.field(
         factory=lambda: cachetools.LRUCache(maxsize=128)
     )
@@ -27,16 +27,24 @@ class KLines:
         symbol: Symbol,
         interval: Interval,
         *,
-        startTime: DateTimeLike,
-        endTime: DateTimeLike,
+        startTime: DateTimeLike | None = None,
+        endTime: DateTimeLike | None = None,
     ) -> pl.DataFrame:
-        start: pendulum.DateTime = tu.as_datetime(startTime)
-        end: pendulum.DateTime = tu.as_datetime(endTime)
+        interval_str: str = interval
+        interval: tu.Interval = tu.Interval.parse(interval_str)
+        end: pendulum.DateTime = (
+            tu.as_datetime(endTime) if endTime is not None else tu.now()
+        )
+        start: pendulum.DateTime = (
+            tu.as_datetime(startTime)
+            if startTime is not None
+            else end - 500 * interval.duration
+        )
         chunks: list[pl.DataFrame] = []
         for date in pendulum.interval(
             start=start.start_of("month"), end=end.start_of("month")
         ).range("months"):
-            delta: pl.DataFrame = self._klines(symbol, interval, date)
+            delta: pl.DataFrame = self._klines(symbol, interval_str, date)
             chunks.append(delta)
         data: pl.DataFrame = pl.concat(chunks)
         data = data.drop("ignore")

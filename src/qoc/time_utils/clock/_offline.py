@@ -33,7 +33,8 @@ class ClockOffline(Clock):
         start: DateTimeLike | None = None,
     ) -> Generator[pendulum.DateTime]:
         if start is None:
-            raise ValueError("start must be provided for offline clock")  # noqa: TRY003
+            msg: str = "start must be provided for offline clock"
+            raise ValueError(msg)
         for tick in self._ticks(
             interval, end=end, max_duration=max_duration, max_iter=max_iter, start=start
         ):

@@ -3,14 +3,15 @@ from typing import Any, override
 
 import attrs
 import binance.spot
+import cachetools
 import polars as pl
 from environs import env
 from loguru import logger
 from typing_extensions import deprecated
 
 import qoc.time_utils as tu
+from qoc.api import utils
 from qoc.api._abc import AbstractApi
-from qoc.api.binance._utils import get_time_unit
 from qoc.api.typing import (
     Account,
     ExchangeInfo,
@@ -22,14 +23,18 @@ from qoc.api.typing import (
     OrderTypeLike,
     Symbol,
 )
+from qoc.api.typing._exchange_info import ExchangeInfoSymbol
 from qoc.time_utils import DateTimeLike
 
-from ._klines import KLines
+from ._klines import ApiBinanceSpotKlines
 
 
 @attrs.define
 class ApiBinanceSpot(AbstractApi):
     client: binance.spot.Spot
+    _exchange_info_cache: cachetools.Cache[Any, ExchangeInfo] = attrs.field(
+        factory=lambda: cachetools.LRUCache(maxsize=128)
+    )
 
     def __init__(
         self,
@@ -49,7 +54,7 @@ class ApiBinanceSpot(AbstractApi):
 
     @property
     def time_unit(self) -> tu.TimeUnit:
-        return get_time_unit(self.client)
+        return utils.get_time_unit(self.client)
 
     # region General
 
@@ -62,6 +67,7 @@ class ApiBinanceSpot(AbstractApi):
         return False
 
     @override
+    @cachetools.cachedmethod(lambda self: self._exchange_info_cache)
     def exchange_info(
         self,
         symbol: Symbol | None = None,
@@ -98,8 +104,8 @@ class ApiBinanceSpot(AbstractApi):
         )
 
     @functools.cached_property
-    def _klines(self) -> KLines:
-        return KLines(client=self.client)
+    def _klines(self) -> ApiBinanceSpotKlines:
+        return ApiBinanceSpotKlines(client=self.client)
 
     # endregion Market Data
 
@@ -107,10 +113,10 @@ class ApiBinanceSpot(AbstractApi):
 
     @override
     def order(
-        self, symbol: str, side: OrderSideLike, type_: OrderTypeLike, **kwargs
+        self, symbol: str, side: OrderSideLike, type: OrderTypeLike, **kwargs
     ) -> OrderResponseFull:
         side = OrderSide(side)
-        type_ = OrderType(type_)
+        type_ = OrderType(type)
         logger.info(
             "New Order > symbol: {}, side: {}, type: {}, {}",
             symbol,
@@ -130,14 +136,14 @@ class ApiBinanceSpot(AbstractApi):
         side: OrderSideLike,
         *,
         quantity: float | str | None = None,
-        quoteOrderQty: float | str | None = None,
         **kwargs,
     ) -> OrderResponseFull:
-        # TODO(liblaf): round quantity according to LOT_SIZE filter
         if quantity is not None:
-            kwargs["quantity"] = _format_float(quantity)
-        if quoteOrderQty is not None:
-            kwargs["quoteOrderQty"] = _format_float(quoteOrderQty)
+            exchange_info: ExchangeInfo = self.exchange_info(symbol)
+            info_symbol: ExchangeInfoSymbol = exchange_info.get_symbol(symbol)
+            if info_symbol.lot_size is not None:
+                quantity = info_symbol.lot_size.round(quantity)
+            kwargs["quantity"] = quantity
         return self.order(symbol, side, OrderType.MARKET, **kwargs)
 
     # endregion Trading
@@ -150,10 +156,6 @@ class ApiBinanceSpot(AbstractApi):
         return Account.model_validate(raw)
 
     # endregion Account
-
-
-def _format_float(obj: str | float) -> str:
-    return f"{obj:f}"
 
 
 @deprecated("Use `ApiBinanceSpot` instead.")

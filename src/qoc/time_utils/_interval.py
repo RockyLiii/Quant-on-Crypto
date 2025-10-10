@@ -66,6 +66,13 @@ class Interval:
         # Monday, aligned with 3d interval
         return pendulum.datetime(year=2001, month=1, day=1)
 
+    def to_str(self, *, case_sensitive: bool = True) -> str:
+        if case_sensitive:
+            return f"{self.count}{self.unit}"
+        if self.unit == IntervalUnit.MONTHS:
+            return f"{self.count}mo"
+        return f"{self.count}{self.unit}"
+
 
 def index_to_datetime(index: int, interval: IntervalLike) -> pendulum.DateTime:
     interval = Interval.parse(interval)

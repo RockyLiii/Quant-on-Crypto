@@ -1,4 +1,4 @@
-from ._clock import clock
+from . import clock
 from ._datetime import DateTimeLike, as_datetime, as_timestamp
 from ._interval import (
     Interval,
@@ -28,6 +28,5 @@ __all__ = [
     "datetime_to_index_floor",
     "index_to_datetime",
     "loop",
-    "now",
     "now",
 ]

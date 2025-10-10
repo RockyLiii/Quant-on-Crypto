@@ -28,7 +28,6 @@ class AbstractApi(abc.ABC):
         self,
         symbol: Symbol | None = None,
         symbols: list[Symbol] | None = None,
-        permissions: list[str] | None = None,
         **kwargs,
     ) -> ExchangeInfo:
         raise NotImplementedError
@@ -53,7 +52,11 @@ class AbstractApi(abc.ABC):
     # region Trading
 
     def order(
-        self, symbol: Symbol, side: OrderSideLike, type_: OrderTypeLike, **kwargs
+        self,
+        symbol: Symbol,
+        side: OrderSideLike,
+        type: OrderTypeLike,  # noqa: A002
+        **kwargs,
     ) -> OrderResponseFull:
         raise NotImplementedError
 
@@ -64,7 +67,6 @@ class AbstractApi(abc.ABC):
         side: OrderSideLike,
         *,
         quantity: float | None = None,
-        quoteOrderQty: float | None = None,
         **kwargs,
     ) -> OrderResponseFull:
         raise NotImplementedError

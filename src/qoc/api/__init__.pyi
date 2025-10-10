@@ -1,7 +1,12 @@
+from . import utils
 from .binance import ApiBinance, ApiBinanceSpot
 from .offline import ApiOffline, ApiOfflineSpot
 from .typing import (
     Account,
+    Asset,
+    Balance,
+    BaseModel,
+    CommissionRates,
     ExchangeInfo,
     ExchangeInfoSymbol,
     Filter,
@@ -16,7 +21,9 @@ from .typing import (
     OrderSideLike,
     OrderType,
     OrderTypeLike,
+    Symbol,
 )
+from .utils import GeoIP, GeoIPLocation, geoip, get_time_unit, klines_schema
 
 __all__ = [
     "Account",
@@ -24,12 +31,18 @@ __all__ = [
     "ApiBinanceSpot",
     "ApiOffline",
     "ApiOfflineSpot",
+    "Asset",
+    "Balance",
+    "BaseModel",
+    "CommissionRates",
     "ExchangeInfo",
     "ExchangeInfoSymbol",
     "Filter",
     "FilterExtra",
     "FilterType",
     "FilterTypeLike",
+    "GeoIP",
+    "GeoIPLocation",
     "Interval",
     "LotSize",
     "OrderResponseFill",
@@ -38,4 +51,9 @@ __all__ = [
     "OrderSideLike",
     "OrderType",
     "OrderTypeLike",
+    "Symbol",
+    "geoip",
+    "get_time_unit",
+    "klines_schema",
+    "utils",
 ]

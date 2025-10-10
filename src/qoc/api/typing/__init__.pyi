@@ -1,15 +1,18 @@
-from ._account import Account
+from ._account import Account, Balance, CommissionRates
 from ._base_model import BaseModel
 from ._enum import OrderSide, OrderSideLike, OrderType, OrderTypeLike
 from ._exchange_info import ExchangeInfo, ExchangeInfoSymbol
 from ._filters import Filter, FilterExtra, FilterType, FilterTypeLike, LotSize
 from ._market_data import Interval
-from ._misc import Symbol
+from ._misc import Asset, Symbol
 from ._trading import OrderResponseFill, OrderResponseFull
 
 __all__ = [
     "Account",
+    "Asset",
+    "Balance",
     "BaseModel",
+    "CommissionRates",
     "ExchangeInfo",
     "ExchangeInfoSymbol",
     "Filter",

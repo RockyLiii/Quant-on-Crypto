@@ -1,4 +1,5 @@
 from ._base_model import BaseModel
+from ._misc import Asset
 
 
 class CommissionRates(BaseModel):
@@ -60,3 +61,9 @@ class Account(BaseModel):
 
     commission_rates: CommissionRates
     balances: list[Balance]
+
+    def get_balance(self, asset: Asset) -> Balance:
+        for b in self.balances:
+            if b.asset == asset:
+                return b
+        raise KeyError(asset)
