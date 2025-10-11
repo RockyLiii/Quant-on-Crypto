@@ -85,7 +85,7 @@ class StrategyRev:
 
     def dump(self, api: qoc.Api) -> None:
         clock: qoc.Clock = qoc.get_clock()
-        cherries.log_metric("time", clock.now)
+        cherries.log_metric("time", clock.now.timestamp(), step=clock.step)
 
         for symbol in self.symbols:
             orders: deque[Order] = self.orders[symbol]

@@ -36,7 +36,7 @@ class ClockOffline(Clock):
             max_iter=max_iter,
             start=start,
         )
-        self.__attrs_init__(interval=interval, now=start, start=start, end=end)  # pyright: ignore[reportAttributeAccessIssue]
+        self.__attrs_init__(interval=interval, now=start, end=end)  # pyright: ignore[reportAttributeAccessIssue]
 
     @property
     @override
