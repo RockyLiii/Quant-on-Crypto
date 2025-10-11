@@ -57,8 +57,7 @@ class StrategyRev:
                 symbol, "1m", endTime=now - self.past_window, limit=1
             )
             past_price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
-            klines = api.klines(symbol, "1m")
-            price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
+            price: float = api.price(symbol, interval="1m")
             past_growth: float = (price - past_price) / past_price
 
             logger.debug(
@@ -99,7 +98,7 @@ class StrategyRev:
                 total_value += balance.free + balance.locked
             else:
                 symbol: Symbol = balance.asset + "USDT"
-                price: float = api.klines(symbol, "1m", limit=1)["close"].last()  # pyright: ignore[reportAssignmentType]
+                price: float = api.price(symbol, interval="1m")
                 total_value += (balance.free + balance.locked) * price
         cherries.log_metric("Total Value (USDT)", total_value, step=clock.step)
 

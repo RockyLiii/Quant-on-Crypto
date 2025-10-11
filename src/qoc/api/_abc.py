@@ -48,6 +48,10 @@ class Api(abc.ABC):
     ) -> pl.DataFrame:
         raise NotImplementedError
 
+    def price(self, symbol: Symbol, interval: Interval = "1s", **kwargs) -> float:
+        klines: pl.DataFrame = self.klines(symbol, interval, limit=1, **kwargs)
+        return klines["close"].last()  # pyright: ignore[reportReturnType]
+
     # endregion Market Data
 
     # region Trading
