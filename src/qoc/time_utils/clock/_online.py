@@ -1,69 +1,67 @@
-import itertools
 import time
-from collections.abc import Generator
 from typing import override
 
+import attrs
 import pendulum
 from loguru import logger
+from pendulum import DateTime
 
 from qoc.time_utils._datetime import DateTimeLike, as_datetime
 from qoc.time_utils._interval import Interval, IntervalLike
 
 from ._abc import Clock
+from ._utils import get_end
 
 
+@attrs.define
 class ClockOnline(Clock):
+    _interval: Interval
+    _now: DateTime
+    _end: DateTime
+    _step: int = 0
+
+    def __init__(
+        self,
+        interval: IntervalLike,
+        *,
+        end: DateTimeLike | None = None,
+        max_duration: pendulum.Duration | None = None,
+        max_iter: int | None = None,
+        start: DateTimeLike | None = None,
+    ) -> None:
+        interval = Interval.parse(interval)
+        start = as_datetime(start) if start is not None else pendulum.now(pendulum.UTC)
+        end = get_end(
+            interval=interval,
+            end=end,
+            max_duration=max_duration,
+            max_iter=max_iter,
+            start=start,
+        )
+        self.__attrs_init__(interval=interval, now=start, start=start, end=end)  # pyright: ignore[reportAttributeAccessIssue]
+
+    @property
     @override
     def now(self) -> pendulum.DateTime:
         return pendulum.now(pendulum.UTC)
 
+    @property
     @override
-    def loop(
-        self,
-        interval: IntervalLike,
-        *,
-        end: DateTimeLike | None = None,
-        max_duration: pendulum.Duration | None = None,
-        max_iter: int | None = None,
-        start: DateTimeLike | None = None,
-    ) -> Generator[pendulum.DateTime]:
-        for tick in self._ticks(
-            interval, end=end, max_duration=max_duration, max_iter=max_iter, start=start
-        ):
-            now: pendulum.DateTime = pendulum.now(pendulum.UTC)
-            if tick < now:
-                logger.warning("clock tick is behind schedule: {} < {}", tick, now)
-            else:
-                duration: pendulum.Interval = tick - now
-                time.sleep(duration.total_seconds())
-            logger.debug("clock tick: {}", tick)
-            yield tick
+    def step(self) -> int:
+        return self._step
 
-    def _ticks(
-        self,
-        interval: IntervalLike,
-        *,
-        end: DateTimeLike | None = None,
-        max_duration: pendulum.Duration | None = None,
-        max_iter: int | None = None,
-        start: DateTimeLike | None = None,
-    ) -> Generator[pendulum.DateTime]:
-        interval: Interval = Interval.parse(interval)
-        start: pendulum.DateTime = (
-            pendulum.now(pendulum.UTC) if start is None else as_datetime(start)
-        )
-        if end is not None:
-            end = as_datetime(end)
-        if max_duration is not None:
-            if end is None:
-                end = start + max_duration
-            else:
-                end = min(end, start + max_duration)
-        current: pendulum.DateTime = start + interval.duration
-        for it in itertools.count():
-            yield current
-            current = current + interval.duration
-            if end is not None and current >= end:
-                break
-            if max_iter is not None and it >= max_iter:
-                break
+    @override
+    def __next__(self) -> DateTime:
+        tick: DateTime = self._now + self._interval.duration
+        now: DateTime = pendulum.now(pendulum.UTC)
+        if tick < now:
+            logger.warning("clock tick is behind schedule: {} < {}", tick, now)
+        else:
+            duration: pendulum.Interval = tick - now
+            time.sleep(duration.total_seconds())
+        self._now = tick
+        self._step += 1
+        if self._end is not None and self._now > self._end:
+            raise StopIteration
+        logger.debug("clock tick {}: {}", self._step, tick)
+        return tick

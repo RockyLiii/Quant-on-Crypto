@@ -1,4 +1,5 @@
 from . import utils
+from ._abc import Api
 from .binance import ApiBinance, ApiBinanceSpot
 from .offline import ApiOffline, ApiOfflineSpot
 from .typing import (
@@ -27,6 +28,7 @@ from .utils import GeoIP, GeoIPLocation, geoip, get_time_unit, klines_schema
 
 __all__ = [
     "Account",
+    "Api",
     "ApiBinance",
     "ApiBinanceSpot",
     "ApiOffline",

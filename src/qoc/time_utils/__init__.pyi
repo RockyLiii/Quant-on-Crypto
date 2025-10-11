@@ -9,7 +9,7 @@ from ._interval import (
     index_to_datetime,
 )
 from ._unit import TimeUnit
-from .clock import Clock, ClockOffline, ClockOnline, configure, loop, now
+from .clock import Clock, ClockOffline, ClockOnline, get_clock, loop, now, set_clock
 
 __all__ = [
     "Clock",
@@ -23,10 +23,11 @@ __all__ = [
     "as_datetime",
     "as_timestamp",
     "clock",
-    "configure",
     "datetime_to_index_ceil",
     "datetime_to_index_floor",
+    "get_clock",
     "index_to_datetime",
     "loop",
     "now",
+    "set_clock",
 ]

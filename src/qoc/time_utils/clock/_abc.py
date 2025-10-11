@@ -1,25 +1,16 @@
 import abc
-from collections.abc import Iterable
+from collections.abc import Iterator
 
-import pendulum
-
-from qoc.time_utils._datetime import DateTimeLike
-from qoc.time_utils._interval import IntervalLike
+from pendulum import DateTime
 
 
-class Clock(abc.ABC):
+class Clock(Iterator[DateTime]):
+    @property
     @abc.abstractmethod
-    def now(self) -> pendulum.DateTime:
+    def now(self) -> DateTime:
         raise NotImplementedError
 
+    @property
     @abc.abstractmethod
-    def loop(
-        self,
-        interval: IntervalLike,
-        *,
-        end: DateTimeLike | None = None,
-        max_duration: pendulum.Duration | None = None,
-        max_iter: int | None = None,
-        start: DateTimeLike | None = None,
-    ) -> Iterable[pendulum.DateTime]:
+    def step(self) -> int:
         raise NotImplementedError

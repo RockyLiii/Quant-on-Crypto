@@ -44,8 +44,10 @@ class ApiBinanceSpotKlines:
         self,
         symbol: Symbol,
         interval: Interval,
+        *,
         startTime: DateTimeLike | None = None,
         endTime: DateTimeLike | None = None,
+        limit: int | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         interval_str: str = interval
@@ -53,11 +55,13 @@ class ApiBinanceSpotKlines:
         end: pendulum.DateTime = (
             tu.now() if endTime is None else tu.as_datetime(endTime)
         )
-        start: pendulum.DateTime
-        if startTime is None:
-            start = end - (self.limit / 2) * interval.duration
-        else:
-            start = tu.as_datetime(startTime)
+        if limit is None:
+            limit = self.limit // 2
+        start: pendulum.DateTime = (
+            tu.as_datetime(startTime)
+            if startTime is not None
+            else end - limit * interval.duration
+        )
 
         chunks: list[pl.DataFrame] = []
         start_index: int = tu.datetime_to_index_floor(start, interval)
@@ -103,9 +107,9 @@ class ApiBinanceSpotKlines:
     ) -> pl.DataFrame:
         key = CacheKey(symbol, interval, start, end)
         if key in self.cache:
-            logger.success("klines cache hit: {}", key)
+            logger.trace("klines cache hit: {}", key)
             return self.cache[key]
-        logger.warning("klines cache miss: {}", key)
+        logger.trace("klines cache miss: {}", key)
         now: pendulum.DateTime = pendulum.now(pendulum.UTC)
         raw: list[list[Any]] = self.client.klines(
             symbol=symbol,

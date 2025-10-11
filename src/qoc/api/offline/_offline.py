@@ -6,12 +6,12 @@ import attrs
 import pandas as pd
 from polars.dataframe import DataFrame
 
-from qoc.api._abc import AbstractApi
+from qoc.api._abc import Api
 from qoc.api.typing import Account, Interval, OrderResponseFull, OrderSideLike
 
 
 @attrs.define
-class ApiOffline(AbstractApi):
+class ApiOffline(Api):
     library: adb.library.Library = attrs.field()
 
     monitor_account: dict = attrs.field(factory=dict)

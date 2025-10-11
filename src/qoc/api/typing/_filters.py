@@ -27,16 +27,16 @@ class LotSize(BaseModel):
     max_qty: float
     step_size: float
 
-    def round(self, quantity: float | str) -> str:
+    def round(self, quantity: float | str) -> float:
         if isinstance(quantity, str):
-            return quantity
+            return float(quantity)
         if quantity < self.min_qty:
             raise ValueError(quantity)
         quantity = (
             round((quantity - self.min_qty) / self.step_size) * self.step_size
             + self.min_qty
         )
-        return f"{quantity:f}"
+        return quantity
 
 
 class MinNotional(BaseModel):

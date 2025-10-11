@@ -15,7 +15,7 @@ from .typing import (
 )
 
 
-class AbstractApi(abc.ABC):
+class Api(abc.ABC):
     # region General
 
     def ping(self) -> None:
@@ -43,6 +43,7 @@ class AbstractApi(abc.ABC):
         *,
         startTime: DateTimeLike | None = None,
         endTime: DateTimeLike | None = None,
+        limit: int | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         raise NotImplementedError
@@ -75,7 +76,7 @@ class AbstractApi(abc.ABC):
 
     # region Account
 
-    def account(self, **kwargs) -> Account:
+    def account(self, *, omitZeroBalances: bool = False, **kwargs) -> Account:
         raise NotImplementedError
 
     # endregion Account

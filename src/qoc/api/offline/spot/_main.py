@@ -6,7 +6,7 @@ import polars as pl
 from liblaf import grapes
 
 import qoc.time_utils as tu
-from qoc.api._abc import AbstractApi
+from qoc.api._abc import Api
 from qoc.api.binance.spot import ApiBinanceSpot
 from qoc.api.typing import (
     Account,
@@ -27,10 +27,10 @@ from qoc.time_utils import DateTimeLike
 
 
 @attrs.define
-class ApiOfflineSpot(AbstractApi):
+class ApiOfflineSpot(Api):
     _api: ApiBinanceSpot = attrs.field(factory=ApiBinanceSpot, kw_only=True)
     _balances: dict[Asset, Balance] = attrs.field(
-        factory=lambda: {"USDT": Balance(asset="USDT", free=10000.0, locked=0.0)}
+        factory=lambda: {"USDT": Balance(asset="USDT", free=1000.0, locked=0.0)}
     )
     _commission_rates: CommissionRates = attrs.field(
         factory=lambda: CommissionRates(maker=0.001, taker=0.001, buyer=0.0, seller=0.0)
@@ -50,10 +50,16 @@ class ApiOfflineSpot(AbstractApi):
         *,
         startTime: DateTimeLike | None = None,
         endTime: DateTimeLike | None = None,
+        limit: int | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         return self._api.klines(
-            symbol, interval, startTime=startTime, endTime=endTime, **kwargs
+            symbol,
+            interval,
+            startTime=startTime,
+            endTime=endTime,
+            limit=limit,
+            **kwargs,
         )
 
     @override
@@ -76,8 +82,18 @@ class ApiOfflineSpot(AbstractApi):
         quote: Balance = self._balances.get(
             info.quote_asset, Balance(asset=info.quote_asset, free=0.0, locked=0.0)
         )
-        if info.lot_size is not None:
-            quantity = info.lot_size.round(quantity)
+        if (lot_size := info.lot_size) is not None:
+            quantity = lot_size.round(quantity)
+
+            # ! temporary fix for floating point precision
+            # ! We should migrate to Decimal in the future
+            def round_balance(b: Balance) -> None:
+                b.free = (
+                    round(b.free / lot_size.step_size) + 1e-3
+                ) * lot_size.step_size
+
+            round_balance(base)
+            round_balance(quote)
         quantity = float(quantity)
         price: float = self.klines(symbol, "1s")["close"].last()  # pyright: ignore[reportAssignmentType]
         cummulative_quote_qty: float = quantity * price
@@ -127,8 +143,8 @@ class ApiOfflineSpot(AbstractApi):
         )
 
     @override
-    def account(self, **kwargs) -> Account:
-        return Account(
-            commission_rates=self._commission_rates,
-            balances=list(self._balances.values()),
-        )
+    def account(self, *, omitZeroBalances: bool = True, **kwargs) -> Account:
+        balances: list[Balance] = list(self._balances.values())
+        if omitZeroBalances:
+            balances = [b for b in balances if b.free > 0.0 or b.locked > 0.0]
+        return Account(commission_rates=self._commission_rates, balances=balances)

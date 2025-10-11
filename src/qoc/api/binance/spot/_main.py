@@ -11,7 +11,7 @@ from typing_extensions import deprecated
 
 import qoc.time_utils as tu
 from qoc.api import utils
-from qoc.api._abc import AbstractApi
+from qoc.api._abc import Api
 from qoc.api.typing import (
     Account,
     ExchangeInfo,
@@ -30,7 +30,7 @@ from ._klines import ApiBinanceSpotKlines
 
 
 @attrs.define
-class ApiBinanceSpot(AbstractApi):
+class ApiBinanceSpot(Api):
     client: binance.spot.Spot
     _exchange_info_cache: cachetools.Cache[Any, ExchangeInfo] = attrs.field(
         factory=lambda: cachetools.LRUCache(maxsize=128)
@@ -91,8 +91,10 @@ class ApiBinanceSpot(AbstractApi):
         self,
         symbol: Symbol,
         interval: Interval,
+        *,
         startTime: DateTimeLike | None = None,
         endTime: DateTimeLike | None = None,
+        limit: int | None = None,
         **kwargs,
     ) -> pl.DataFrame:
         return self._klines(
@@ -100,6 +102,7 @@ class ApiBinanceSpot(AbstractApi):
             interval=interval,
             startTime=startTime,
             endTime=endTime,
+            limit=limit,
             **kwargs,
         )
 

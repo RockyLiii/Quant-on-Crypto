@@ -8,7 +8,7 @@ from . import (
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
-from .api import ApiBinance, ApiBinanceSpot, ApiOffline, ApiOfflineSpot
+from .api import Api, ApiBinance, ApiBinanceSpot, ApiOffline, ApiOfflineSpot
 from .balance import Balance
 from .database import Database, Library
 from .market import Market
@@ -24,13 +24,13 @@ from .time_utils import (
     TimeUnit,
     as_datetime,
     as_timestamp,
-    clock,
-    configure,
     datetime_to_index_ceil,
     datetime_to_index_floor,
+    get_clock,
     index_to_datetime,
     loop,
     now,
+    set_clock,
 )
 from .utils import (
     UppercaseEnum,
@@ -42,6 +42,7 @@ from .utils import (
 )
 
 __all__ = [
+    "Api",
     "ApiBinance",
     "ApiBinanceSpot",
     "ApiOffline",
@@ -67,19 +68,19 @@ __all__ = [
     "as_datetime",
     "as_timestamp",
     "balance",
-    "clock",
-    "configure",
     "data_dir",
     "datetime_to_index_ceil",
     "datetime_to_index_floor",
     "entrypoint",
     "feature",
     "fig_dir",
+    "get_clock",
     "index_to_datetime",
     "insert_time",
     "loop",
     "market",
     "now",
+    "set_clock",
     "struct",
     "time_utils",
     "utils",
