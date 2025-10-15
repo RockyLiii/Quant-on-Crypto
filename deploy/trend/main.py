@@ -62,30 +62,59 @@ class TimeSeriesData:
 
 
 @attrs.define
-class StrategyRev:
-    symbols: list[Symbol] = attrs.field(factory=lambda: ["BTCUSDT"])
+class StrategyTrend:
+    symbols: list[Symbol] = attrs.field(factory=lambda: [ "DOGEUSDT"])
 
     # -------------------------------- Config -------------------------------- #
 
-    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=5))
+    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(days=4))
     """过去窗口"""
 
-    future_end: Duration = attrs.field(factory=lambda: pendulum.duration(hours=30))
-    """持有期"""
-
-    bullet_size: float = 25
+    bullet_size: float = 45
     """单次下单资金 (USDT)"""
 
-    past_threshold: float = -0.02
-    """买入阈值 (跌幅)"""
 
-    max_holdings: int = 5
+    max_holdings: int = 1
     """单标最大持仓 (单)"""
+
 
     # --------------------------------- State -------------------------------- #
     orders: collections.defaultdict[str, deque[Order]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
+
+    volumes: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Historical prices for each symbol"""
+
+    prices_times_volumes: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Historical price*volume products for each symbol"""
+
+    vwaps: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Historical VWAP values for each symbol"""
+
+    vwaps_deri_1: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """First derivative of VWAP for each symbol"""
+
+    vwaps_deri_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Second derivative of VWAP for each symbol"""
+
+    vwaps_deri_3: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Third derivative of VWAP for each symbol"""
+
+
+    past_window_length: int = attrs.field(default=576)
 
     # Time series storage
     time_series: TimeSeriesData = attrs.field(factory=TimeSeriesData)
@@ -94,6 +123,61 @@ class StrategyRev:
     # Track last logged date for daily logging
     last_logged_date: str = attrs.field(default="")
     """Last logged date for daily progress tracking"""
+
+    def update_indicators(self, symbol: str, price: float, volume: float):
+        """Update price and volume based indicators"""
+        if volume == 0:
+            volume = 1e-6  # Prevent division by zero
+        self.volumes[symbol].append(volume)
+        if len(self.volumes[symbol]) > self.past_window_length:
+            self.volumes[symbol].popleft()
+
+        self.prices_times_volumes[symbol].append(price * volume)
+        if len(self.prices_times_volumes[symbol]) > self.past_window_length:
+            self.prices_times_volumes[symbol].popleft()
+
+        self.vwaps[symbol].append(sum(self.prices_times_volumes[symbol]) / sum(self.volumes[symbol]))
+        if len(self.vwaps[symbol]) > self.past_window_length:
+            self.vwaps[symbol].popleft()
+
+        self.vwaps_deri_1[symbol].append(self.vwaps[symbol][-1] - self.vwaps[symbol][0])
+        if len(self.vwaps_deri_1[symbol]) > self.past_window_length:
+            self.vwaps_deri_1[symbol].popleft()
+
+        self.vwaps_deri_2[symbol].append(self.vwaps_deri_1[symbol][-1] - self.vwaps_deri_1[symbol][0])   
+        if len(self.vwaps_deri_2[symbol]) > self.past_window_length:
+            self.vwaps_deri_2[symbol].popleft()
+
+        self.vwaps_deri_3[symbol].append(self.vwaps_deri_2[symbol][-1] - self.vwaps_deri_2[symbol][0])   
+        if len(self.vwaps_deri_3[symbol]) > self.past_window_length:
+            self.vwaps_deri_3[symbol].popleft()
+
+
+    def __attrs_post_init__(self) -> None:
+        """在所有字段初始化后执行的自定义初始化逻辑"""
+        logger.info("Initializing StrategyTrend state...")
+        
+        # 可以在这里设置初始值或执行其他初始化逻辑
+        for symbol in self.symbols:
+            logger.info(f"Initialized state for symbol: {symbol}")
+            self.past_window_length = int(self.past_window.in_minutes() / 5)
+
+            now: DateTime = qoc.now()
+
+            api: qoc.Api = qoc.ApiBinanceSpot() if Config().online else qoc.ApiOfflineSpot()
+            klines: pl.DataFrame = api.klines(
+                symbol=symbol, interval="5m", endTime=now, limit=self.past_window_length*4
+            )
+
+
+            prices = klines["close"].to_list() 
+            volumes = klines["volume"].to_list()
+
+            for i in range(len(prices)):
+                self.update_indicators(symbol, prices[i], volumes[i])                
+        
+        logger.info(f"Strategy initialized with {len(self.symbols)} symbols: {self.symbols}")
+
 
     def get_time_series(self) -> TimeSeriesData:
         """Return the complete time series data"""
@@ -111,12 +195,10 @@ class StrategyRev:
         orders: deque[Order] = deque()  # Initialize with a default value
         for symbol in self.symbols:
             orders = self.orders[symbol]
-            klines: pl.DataFrame = api.klines(
-                symbol, "1m", endTime=now - self.past_window, limit=1
-            )
-            past_price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
-            price: float = api.price(symbol, interval="1m")
-            past_growth: float = (price - past_price) / past_price
+            klines: pl.DataFrame = api.klines(symbol, "1m", endTime=now, limit=1)
+            price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
+            volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
+            self.update_indicators(symbol, price, volume)
 
             # logger.debug(
             #     "{} past growth: {:.4f}, now holdings: {}",
@@ -124,7 +206,7 @@ class StrategyRev:
             #     past_growth,
             #     len(orders),
             # )
-            if past_growth < self.past_threshold and len(orders) < self.max_holdings:
+            if self.vwaps_deri_1[symbol][-1]>0 and self.vwaps_deri_2[symbol][-1]>0 and self.vwaps_deri_3[symbol][-1]>0 and len(orders) < self.max_holdings:
                 quantity: float = self.bullet_size / price
                 response: OrderResponseFull = api.order_market(
                     symbol, OrderSide.BUY, quantity=quantity
@@ -136,12 +218,12 @@ class StrategyRev:
                         time=response.transact_time,
                     )
                 )
-            while orders and orders[0].time + self.future_end < now:
+            while orders and not(self.vwaps_deri_1[symbol][-1]>0 and self.vwaps_deri_2[symbol][-1]>0 and self.vwaps_deri_3[symbol][-1]>0):
                 order: Order = orders.popleft()
                 api.order_market(order.symbol, OrderSide.SELL, quantity=order.quantity)
             self.orders[symbol] = orders
 
-        self.time_series.add_metric("now holding", now, len(orders))
+        # self.time_series.add_metric("now holding", now, len(orders))
         
 
 
@@ -245,7 +327,7 @@ def plot_time_series(tss: TimeSeriesData, output_dir: str = "./plots") -> None:
             plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
         
-        # Limit maximum number of ticks to prevent the warning
+        # Limit maximum number of ticks to ptrendent the warning
         plt.gca().xaxis.set_major_locator(plt.MaxNLocator(nbins=10))
         
         plt.xticks(rotation=45)
@@ -270,7 +352,7 @@ def main(cfg: Config) -> None:
             qoc.ClockOffline(interval="5m", start="2025-10-01", end="2025-10-15")
         )
     api: qoc.Api = qoc.ApiBinanceSpot() if cfg.online else qoc.ApiOfflineSpot()
-    strategy = StrategyRev()
+    strategy = StrategyTrend()
 
     logger.info("Starting strategy execution...")
     
@@ -285,11 +367,10 @@ def main(cfg: Config) -> None:
     
     logger.info("Strategy execution completed, generating plots...")
     tss = strategy.get_time_series()
-    plot_time_series(tss, output_dir="deploy/rev/plots")
+    plot_time_series(tss, output_dir="deploy/trend/plots")
 
 
 if __name__ == "__main__":
     main(cfg=Config())
 
-
-# BINANCE_BASE_URL='https://api.binance.us' python /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/rev/main.py
+# BINANCE_BASE_URL='https://api.binance.us' python /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/trend/main.py

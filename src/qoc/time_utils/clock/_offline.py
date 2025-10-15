@@ -54,5 +54,5 @@ class ClockOffline(Clock):
         self._step += 1
         if self._end is not None and self._now > self._end:
             raise StopIteration
-        logger.debug("clock tick {}: {}", self._step, self._now)
+        # logger.debug("clock tick {}: {}", self._step, self._now)
         return self._now

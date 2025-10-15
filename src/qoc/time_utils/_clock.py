@@ -78,7 +78,7 @@ def clock(
             )
             continue
         time.sleep(sleep_for)
-        logger.debug("clock tick: {}", tick.isoformat())
+        # logger.debug("clock tick: {}", tick.isoformat())
         yield tick
 
 

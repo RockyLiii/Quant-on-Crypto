@@ -33,7 +33,7 @@ class ApiOfflineSpot(Api):
         factory=lambda: {"USDT": Balance(asset="USDT", free=1000.0, locked=0.0)}
     )
     _commission_rates: CommissionRates = attrs.field(
-        factory=lambda: CommissionRates(maker=0.001, taker=0.001, buyer=0.0, seller=0.0)
+        factory=lambda: CommissionRates(maker=0.0002, taker=0.0005, buyer=0.0, seller=0.0)
     )
 
     @override
@@ -95,7 +95,7 @@ class ApiOfflineSpot(Api):
             round_balance(base)
             round_balance(quote)
         quantity = float(quantity)
-        price: float = self.klines(symbol, "1s")["close"].last()  # pyright: ignore[reportAssignmentType]
+        price: float = self.klines(symbol, "1m")["close"].last()  # pyright: ignore[reportAssignmentType]
         cummulative_quote_qty: float = quantity * price
         commission: float
         match side:

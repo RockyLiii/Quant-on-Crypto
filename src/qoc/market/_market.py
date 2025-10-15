@@ -11,7 +11,7 @@ from qoc import api, database
 class Market:
     library: database.Library = attrs.field()
     symbols: list[str] = attrs.field(factory=lambda: ["BTCUSDT"])
-    interval: api.Interval = attrs.field(default="1s")
+    interval: api.Interval = attrs.field(default="1m")
 
     def convert(self, qty: float, base: str, quote: str) -> float:
         if base == quote:
