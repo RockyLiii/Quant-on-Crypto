@@ -18,6 +18,7 @@ words:
   - apng
   - arcticdb
   - arithmatex
+  - asyncio
   - axhline
   - axvline
   - axvspan
@@ -29,8 +30,10 @@ words:
   - ccfedabc
   - clientorderid
   - cmap
+  - cmis
   - coef
   - coefs
+  - coro
   - corrcoef
   - csvlib
   - cummulative
@@ -53,12 +56,14 @@ words:
   - getattr
   - groupby
   - hmstr
+  - hstack
   - httpx
   - hynek
   - iloc
   - inlinehilite
   - inplace
   - ioargs
+  - ipkernel
   - ipykernel
   - ipynb
   - ipython
@@ -75,20 +80,24 @@ words:
   - liii
   - lizeyu
   - lmdb
+  - mabs
   - macd
   - magausdt
   - mand
   - margs
   - marketsimu
+  - mback
   - mblue
   - mcheck
   - mchunksize
   - mcolumns
   - mcompression
   - mdate
+  - mdates
   - mdecimal
   - mdef
   - mdeprecate
+  - mdiff
   - mdoublequote
   - mdtype
   - melif
@@ -101,6 +110,7 @@ words:
   - mfor
   - mformat
   - mget
+  - mgetattr
   - mgreen
   - mhandle
   - mhandles
@@ -137,16 +147,19 @@ words:
   - msave
   - mself
   - msep
+  - mstderr
   - mstorage
   - mstr
   - mstrict
   - msuffix
+  - msum
   - msymbol
   - mtitle
   - mupdate
   - mutf
   - mwarn
   - mwith
+  - mwrite
   - mwriter
   - mxlabel
   - myield
@@ -154,6 +167,7 @@ words:
   - mzstd
   - nbconvert
   - nbformat
+  - nbins
   - ndarray
   - neiro
   - notna
@@ -170,7 +184,9 @@ words:
   - pnls
   - pnut
   - polusdt
+  - ptrendent
   - pyarrow
+  - pybind
   - pybuilder
   - pycache
   - pydantic
@@ -197,6 +213,7 @@ words:
   - resi
   - rmtree
   - rsts
+  - runpy
   - satoshiusdt
   - scipy
   - scrapy
@@ -210,7 +227,6 @@ words:
   - thres
   - tolist
   - tombi
-  - topk
   - tqdm
   - tradeid
   - trimesh
@@ -218,15 +234,20 @@ words:
   - tsmom
   - twinx
   - ufeff
+  - umath
+  - usds
   - venv
   - vstack
   - vwap
   - vwaps
   - webp
+  - xaxis
   - xdata
   - xlabel
+  - xlim
   - xticklabels
   - xticks
   - ylabel
   - ylim
   - yticklabels
+  - zmqshell

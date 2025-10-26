@@ -1,19 +1,16 @@
 import collections
-from collections import deque
-
-from typing import Dict, List, Tuple, Any
-from pathlib import Path
 import os
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+from collections import deque
+from pathlib import Path
 
 import attrs
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import pendulum
 import polars as pl
 from liblaf import cherries
 from loguru import logger
 from pendulum import DateTime, Duration
-import numpy as np
 
 import qoc
 from qoc.api.typing import Balance, OrderResponseFull, OrderSide, Symbol
@@ -33,37 +30,35 @@ class Order:
 @attrs.define
 class TimeSeriesData:
     """Flexible time series storage structure"""
-    data: Dict[str, List[Tuple[DateTime, float]]] = attrs.field(factory=dict)
-    
+
+    data: dict[str, list[tuple[DateTime, float]]] = attrs.field(factory=dict)
+
     def add_metric(self, metric_name: str, timestamp: DateTime, value: float) -> None:
         """Add a metric value at a specific timestamp"""
         if metric_name not in self.data:
             self.data[metric_name] = []
         self.data[metric_name].append((timestamp, value))
-    
-    def get_metric(self, metric_name: str) -> List[Tuple[DateTime, float]]:
+
+    def get_metric(self, metric_name: str) -> list[tuple[DateTime, float]]:
         """Get time series data for a specific metric"""
         return self.data.get(metric_name, [])
-    
+
     def to_dataframe(self, metric_name: str) -> pl.DataFrame:
         """Convert a metric's time series to Polars DataFrame"""
         if metric_name not in self.data:
             return pl.DataFrame()
-        
-        timestamps, values = zip(*self.data[metric_name])
-        return pl.DataFrame({
-            "timestamp": timestamps,
-            "value": values
-        })
-    
-    def get_all_metrics(self) -> List[str]:
+
+        timestamps, values = zip(*self.data[metric_name], strict=False)
+        return pl.DataFrame({"timestamp": timestamps, "value": values})
+
+    def get_all_metrics(self) -> list[str]:
         """Get list of all available metrics"""
         return list(self.data.keys())
 
 
 @attrs.define
 class StrategyTrend:
-    symbols: list[Symbol] = attrs.field(factory=lambda: [ "DOGEUSDT"])
+    symbols: list[Symbol] = attrs.field(factory=lambda: ["DOGEUSDT"])
 
     # -------------------------------- Config -------------------------------- #
 
@@ -73,10 +68,8 @@ class StrategyTrend:
     bullet_size: float = 45
     """单次下单资金 (USDT)"""
 
-
     max_holdings: int = 1
     """单标最大持仓 (单)"""
-
 
     # --------------------------------- State -------------------------------- #
     orders: collections.defaultdict[str, deque[Order]] = attrs.field(
@@ -113,7 +106,6 @@ class StrategyTrend:
     )
     """Third derivative of VWAP for each symbol"""
 
-
     past_window_length: int = attrs.field(default=576)
 
     # Time series storage
@@ -136,7 +128,9 @@ class StrategyTrend:
         if len(self.prices_times_volumes[symbol]) > self.past_window_length:
             self.prices_times_volumes[symbol].popleft()
 
-        self.vwaps[symbol].append(sum(self.prices_times_volumes[symbol]) / sum(self.volumes[symbol]))
+        self.vwaps[symbol].append(
+            sum(self.prices_times_volumes[symbol]) / sum(self.volumes[symbol])
+        )
         if len(self.vwaps[symbol]) > self.past_window_length:
             self.vwaps[symbol].popleft()
 
@@ -144,19 +138,22 @@ class StrategyTrend:
         if len(self.vwaps_deri_1[symbol]) > self.past_window_length:
             self.vwaps_deri_1[symbol].popleft()
 
-        self.vwaps_deri_2[symbol].append(self.vwaps_deri_1[symbol][-1] - self.vwaps_deri_1[symbol][0])   
+        self.vwaps_deri_2[symbol].append(
+            self.vwaps_deri_1[symbol][-1] - self.vwaps_deri_1[symbol][0]
+        )
         if len(self.vwaps_deri_2[symbol]) > self.past_window_length:
             self.vwaps_deri_2[symbol].popleft()
 
-        self.vwaps_deri_3[symbol].append(self.vwaps_deri_2[symbol][-1] - self.vwaps_deri_2[symbol][0])   
+        self.vwaps_deri_3[symbol].append(
+            self.vwaps_deri_2[symbol][-1] - self.vwaps_deri_2[symbol][0]
+        )
         if len(self.vwaps_deri_3[symbol]) > self.past_window_length:
             self.vwaps_deri_3[symbol].popleft()
-
 
     def __attrs_post_init__(self) -> None:
         """在所有字段初始化后执行的自定义初始化逻辑"""
         logger.info("Initializing StrategyTrend state...")
-        
+
         # 可以在这里设置初始值或执行其他初始化逻辑
         for symbol in self.symbols:
             logger.info(f"Initialized state for symbol: {symbol}")
@@ -164,20 +161,25 @@ class StrategyTrend:
 
             now: DateTime = qoc.now()
 
-            api: qoc.Api = qoc.ApiBinanceSpot() if Config().online else qoc.ApiOfflineSpot()
+            api: qoc.Api = (
+                qoc.ApiBinanceSpot() if Config().online else qoc.ApiOfflineSpot()
+            )
             klines: pl.DataFrame = api.klines(
-                symbol=symbol, interval="5m", endTime=now, limit=self.past_window_length*4
+                symbol=symbol,
+                interval="5m",
+                endTime=now,
+                limit=self.past_window_length * 4,
             )
 
-
-            prices = klines["close"].to_list() 
+            prices = klines["close"].to_list()
             volumes = klines["volume"].to_list()
 
             for i in range(len(prices)):
-                self.update_indicators(symbol, prices[i], volumes[i])                
-        
-        logger.info(f"Strategy initialized with {len(self.symbols)} symbols: {self.symbols}")
+                self.update_indicators(symbol, prices[i], volumes[i])
 
+        logger.info(
+            f"Strategy initialized with {len(self.symbols)} symbols: {self.symbols}"
+        )
 
     def get_time_series(self) -> TimeSeriesData:
         """Return the complete time series data"""
@@ -185,13 +187,13 @@ class StrategyTrend:
 
     def step(self, api: qoc.Api) -> None:
         now: DateTime = qoc.now()
-        
+
         # Check if we've entered a new day and log progress
-        current_date = now.format('YYYY-MM-DD')
+        current_date = now.format("YYYY-MM-DD")
         if current_date != self.last_logged_date:
             logger.info(f"Trading Date: {current_date}")
             self.last_logged_date = current_date
-        
+
         orders: deque[Order] = deque()  # Initialize with a default value
         for symbol in self.symbols:
             orders = self.orders[symbol]
@@ -206,7 +208,12 @@ class StrategyTrend:
             #     past_growth,
             #     len(orders),
             # )
-            if self.vwaps_deri_1[symbol][-1]>0 and self.vwaps_deri_2[symbol][-1]>0 and self.vwaps_deri_3[symbol][-1]>0 and len(orders) < self.max_holdings:
+            if (
+                self.vwaps_deri_1[symbol][-1] > 0
+                and self.vwaps_deri_2[symbol][-1] > 0
+                and self.vwaps_deri_3[symbol][-1] > 0
+                and len(orders) < self.max_holdings
+            ):
                 quantity: float = self.bullet_size / price
                 response: OrderResponseFull = api.order_market(
                     symbol, OrderSide.BUY, quantity=quantity
@@ -218,14 +225,16 @@ class StrategyTrend:
                         time=response.transact_time,
                     )
                 )
-            while orders and not(self.vwaps_deri_1[symbol][-1]>0 and self.vwaps_deri_2[symbol][-1]>0 and self.vwaps_deri_3[symbol][-1]>0):
+            while orders and not (
+                self.vwaps_deri_1[symbol][-1] > 0
+                and self.vwaps_deri_2[symbol][-1] > 0
+                and self.vwaps_deri_3[symbol][-1] > 0
+            ):
                 order: Order = orders.popleft()
                 api.order_market(order.symbol, OrderSide.SELL, quantity=order.quantity)
             self.orders[symbol] = orders
 
         # self.time_series.add_metric("now holding", now, len(orders))
-        
-
 
     def dump(self, api: qoc.Api) -> None:
         clock: qoc.Clock = qoc.get_clock()
@@ -244,103 +253,102 @@ class StrategyTrend:
                 symbol: Symbol = balance.asset + "USDT"
                 price: float = api.price(symbol, interval="1m")
                 total_value += (balance.free + balance.locked) * price
-        
+
         # Store total value with datetime index
         self.time_series.add_metric("total_value", clock.now, total_value)
-        
+
         cherries.log_metric("Total Value (USDT)", total_value, step=clock.step)
 
 
 def plot_time_series(tss: TimeSeriesData, output_dir: str = "./plots") -> None:
-    """
-    Plot time series data and save to specified directory
-    
+    """Plot time series data and save to specified directory
+
     Args:
         tss: TimeSeriesData object containing the time series data
         output_dir: Directory to save the plots
     """
     # Create output directory if it doesn't exist
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
+
     # Get all available metrics
     metrics = tss.get_all_metrics()
-    
+
     if not metrics:
         logger.warning("No metrics found in time series data")
         return
-    
+
     logger.info(f"Plotting {len(metrics)} metrics: {metrics}")
-    
+
     # Plot each metric separately
     for metric in metrics:
         data = tss.get_metric(metric)
-        
+
         if not data:
             logger.warning(f"No data found for metric: {metric}")
             continue
-        
+
         # Extract timestamps and values
-        timestamps, values = zip(*data)
-        
+        timestamps, values = zip(*data, strict=False)
+
         # Convert pendulum DateTime to python datetime for matplotlib
         datetime_list = []
         for ts in timestamps:
-            if hasattr(ts, 'to_datetime'):
+            if hasattr(ts, "to_datetime"):
                 # For pendulum DateTime objects
                 datetime_list.append(ts.to_datetime())
-            elif hasattr(ts, 'in_timezone'):
+            elif hasattr(ts, "in_timezone"):
                 # Alternative method for pendulum DateTime
-                datetime_list.append(ts.in_timezone('UTC').replace(tzinfo=None))
+                datetime_list.append(ts.in_timezone("UTC").replace(tzinfo=None))
             else:
                 # For regular datetime objects
                 datetime_list.append(ts)
-        
+
         # Create the plot
         plt.figure(figsize=(14, 8))
-        plt.plot(datetime_list, values, linewidth=2, marker='o', markersize=2)
-        
+        plt.plot(datetime_list, values, linewidth=2, marker="o", markersize=2)
+
         # Format the plot
-        plt.title(f'Time Series: {metric}', fontsize=16, fontweight='bold')
-        plt.xlabel('Time', fontsize=12)
-        plt.ylabel('Value', fontsize=12)
+        plt.title(f"Time Series: {metric}", fontsize=16, fontweight="bold")
+        plt.xlabel("Time", fontsize=12)
+        plt.ylabel("Value", fontsize=12)
         plt.grid(True, alpha=0.3)
-        
+
         # Calculate time span to set appropriate tick interval
         time_span = datetime_list[-1] - datetime_list[0]
         days = time_span.days
-        
+
         # Set appropriate time locator based on data span
         if days <= 1:
             # For data spanning 1 day or less, show every 2 hours
             plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         elif days <= 7:
             # For data spanning up to a week, show every 12 hours
             plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=12))
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
         elif days <= 30:
             # For data spanning up to a month, show daily
             plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
         else:
             # For longer periods, show weekly
             plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-        
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+
         # Limit maximum number of ticks to ptrendent the warning
         plt.gca().xaxis.set_major_locator(plt.MaxNLocator(nbins=10))
-        
+
         plt.xticks(rotation=45)
-        
+
         # Adjust layout
         plt.tight_layout()
-        
+
         # Save the plot
-        safe_filename = metric.replace('/', '_').replace(' ', '_')
+        safe_filename = metric.replace("/", "_").replace(" ", "_")
         output_path = os.path.join(output_dir, f"{safe_filename}.png")
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
         plt.close()
-        
+
         logger.info(f"Saved plot for {metric} to: {output_path}")
 
 
@@ -355,7 +363,7 @@ def main(cfg: Config) -> None:
     strategy = StrategyTrend()
 
     logger.info("Starting strategy execution...")
-    
+
     for _ in qoc.loop():
         try:
             strategy.step(api=api)
@@ -364,7 +372,7 @@ def main(cfg: Config) -> None:
             if isinstance(e, (KeyboardInterrupt, SystemExit)):
                 raise
             logger.exception("error")
-    
+
     logger.info("Strategy execution completed, generating plots...")
     tss = strategy.get_time_series()
     plot_time_series(tss, output_dir="deploy/trend/plots")

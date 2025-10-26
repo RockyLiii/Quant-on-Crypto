@@ -22,17 +22,18 @@ def get_time_unit(_client: Any) -> tu.TimeUnit:
     return tu.TimeUnit.MILLISECOND
 
 
+@get_time_unit.register(requests.Session)
 def _get_time_unit_session(session: requests.Session) -> tu.TimeUnit:
     return tu.TimeUnit(session.headers.get("X-MBX-TIME-UNIT", tu.TimeUnit.MILLISECOND))
 
 
 @get_time_unit.register(Spot)
 def _get_time_unit_spot(client: Spot) -> tu.TimeUnit:
-    return _get_time_unit_session(client.session)
+    return get_time_unit(client.session)
 
 
 @get_time_unit.register(DerivativesTradingUsdsFuturesRestAPI)
 def _get_time_unit_derivatives_trading_usds_futures(
     client: DerivativesTradingUsdsFuturesRestAPI,
 ) -> tu.TimeUnit:
-    return _get_time_unit_session(client._session)  # noqa: SLF001
+    return get_time_unit(client._session)  # noqa: SLF001

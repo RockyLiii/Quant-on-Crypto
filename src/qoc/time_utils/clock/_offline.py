@@ -1,7 +1,6 @@
 from typing import override
 
 import attrs
-from loguru import logger
 from pendulum import DateTime, Duration
 
 from qoc.time_utils._datetime import DateTimeLike, as_datetime

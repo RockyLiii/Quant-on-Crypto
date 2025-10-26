@@ -33,7 +33,9 @@ class ApiOfflineSpot(Api):
         factory=lambda: {"USDT": Balance(asset="USDT", free=1000.0, locked=0.0)}
     )
     _commission_rates: CommissionRates = attrs.field(
-        factory=lambda: CommissionRates(maker=0.0002, taker=0.0005, buyer=0.0, seller=0.0)
+        factory=lambda: CommissionRates(
+            maker=0.0002, taker=0.0005, buyer=0.0, seller=0.0
+        )
     )
 
     @override
