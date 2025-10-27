@@ -14,6 +14,7 @@ from .api import (
     ApiBinanceFutures,
     ApiBinanceSpot,
     ApiOffline,
+    ApiOfflineFutures,
     ApiOfflineSpot,
 )
 from .balance import Balance
@@ -54,6 +55,7 @@ __all__ = [
     "ApiBinanceFutures",
     "ApiBinanceSpot",
     "ApiOffline",
+    "ApiOfflineFutures",
     "ApiOfflineSpot",
     "Balance",
     "Clock",

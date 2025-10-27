@@ -1,6 +1,8 @@
 import functools
+from typing import Any
 
 import attrs
+import cachetools
 import polars as pl
 from binance_common.configuration import ConfigurationRestAPI
 from binance_common.models import ApiResponse
@@ -10,6 +12,7 @@ from binance_sdk_derivatives_trading_usds_futures.rest_api import (
 )
 from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     AccountInformationV3Response,
+    ExchangeInformationResponse,
     NewOrderResponse,
     NewOrderSideEnum,
 )
@@ -27,6 +30,9 @@ from ._klines import FuturesKlinesCache
 @attrs.define
 class ApiBinanceFutures:
     client: DerivativesTradingUsdsFutures
+    _exchange_information_cache: cachetools.Cache[Any, ExchangeInformationResponse] = (
+        attrs.field(factory=lambda: cachetools.LRUCache(maxsize=8))
+    )
 
     def __init__(
         self,
@@ -58,6 +64,13 @@ class ApiBinanceFutures:
     @property
     def time_unit(self) -> tu.TimeUnit:
         return get_time_unit(self.rest_api)
+
+    @cachetools.cachedmethod(lambda self: self._exchange_information_cache)
+    def exchange_information(self) -> ExchangeInformationResponse:
+        resp: ApiResponse[ExchangeInformationResponse] = (
+            self.rest_api.exchange_information()
+        )
+        return resp.data()
 
     def klines(
         self,
