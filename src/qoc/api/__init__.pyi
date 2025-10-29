@@ -1,7 +1,7 @@
 from . import utils
 from ._abc import Api
-from .binance import ApiBinance, ApiBinanceSpot
-from .offline import ApiOffline, ApiOfflineSpot
+from .binance import ApiBinance, ApiBinanceFutures, ApiBinanceSpot
+from .offline import ApiOffline, ApiOfflineFutures, ApiOfflineSpot
 from .typing import (
     Account,
     Asset,
@@ -30,8 +30,10 @@ __all__ = [
     "Account",
     "Api",
     "ApiBinance",
+    "ApiBinanceFutures",
     "ApiBinanceSpot",
     "ApiOffline",
+    "ApiOfflineFutures",
     "ApiOfflineSpot",
     "Asset",
     "Balance",

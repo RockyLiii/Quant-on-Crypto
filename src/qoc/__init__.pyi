@@ -8,7 +8,15 @@ from . import (
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
-from .api import Api, ApiBinance, ApiBinanceSpot, ApiOffline, ApiOfflineSpot
+from .api import (
+    Api,
+    ApiBinance,
+    ApiBinanceFutures,
+    ApiBinanceSpot,
+    ApiOffline,
+    ApiOfflineFutures,
+    ApiOfflineSpot,
+)
 from .balance import Balance
 from .database import Database, Library
 from .market import Market
@@ -44,8 +52,10 @@ from .utils import (
 __all__ = [
     "Api",
     "ApiBinance",
+    "ApiBinanceFutures",
     "ApiBinanceSpot",
     "ApiOffline",
+    "ApiOfflineFutures",
     "ApiOfflineSpot",
     "Balance",
     "Clock",

@@ -7,7 +7,7 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
-  { name = "RockyLiii", email = "93507477+RockyLiii@users.noreply.github.com" },
+  { name = "RockyLiii", email = "93507477+RockyLiii@users.noreply.github.com" }
 ]
 keywords = []
 classifiers = [
@@ -22,20 +22,21 @@ classifiers = [
   "Topic :: Office/Business",
   "Topic :: Office/Business :: Financial",
   "Topic :: Office/Business :: Financial :: Investment",
-  "Typing :: Typed",
+  "Typing :: Typed"
 ]
 dependencies = [
   "arcticdb>=6,<7",
   "attrs>=25,<26",
   "binance-connector>=3,<4",
+  "binance-sdk-derivatives-trading-usds-futures>=1,<2",
   "cachetools>=6,<7",
   "environs>=14,<15",
   "hishel>=0.1.3",
   "httpx[socks]>=0.28,<0.29",
   "jaxtyping>=0.3,<0.4",
   "lazy-loader>=0.4,<0.5",
-  "liblaf-cherries>=0.5,<0.6",
-  "liblaf-grapes>=5,<6",
+  "liblaf-cherries>=0.6,<0.7",
+  "liblaf-grapes>=6,<7",
   "loguru>=0.7,<0.8",
   "matplotlib>=3,<4",
   "numpy>=2,<3",
@@ -50,7 +51,7 @@ dependencies = [
   "scipy>=1,<2",
   "seaborn>=0.13,<0.14",
   "torch>=2,<3",
-  "tqdm>=4,<5",
+  "tqdm>=4,<5"
 ]
 dynamic = ["version"]
 
@@ -102,7 +103,7 @@ addopts = [
   "--import-mode=importlib",
   "--showlocals",
   "--strict-config",
-  "--strict-markers",
+  "--strict-markers"
 ]
 testpaths = ["benches", "src", "tests"]
 

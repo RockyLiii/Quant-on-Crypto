@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from ._base_model import BaseModel
 from ._misc import Asset
 
