@@ -5,6 +5,7 @@ from . import (
     market,
     struct,
     time_utils,
+    typing,
     utils,
 )
 from ._version import __version__, __version_tuple__, version, version_tuple
@@ -93,6 +94,7 @@ __all__ = [
     "set_clock",
     "struct",
     "time_utils",
+    "typing",
     "utils",
     "version",
     "version_tuple",

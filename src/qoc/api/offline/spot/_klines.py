@@ -3,11 +3,11 @@ from typing import Any
 
 import attrs
 import cachetools
-import hishel
 import httpx
 import pendulum
 import polars as pl
 import pooch
+from hishel.httpx import SyncCacheClient
 from polars._typing import PolarsDataType
 
 import qoc.time_utils as tu
@@ -20,7 +20,7 @@ class ApiOfflineSpotKlines:
     cache: cachetools.Cache[Any, pl.DataFrame] = attrs.field(
         factory=lambda: cachetools.LRUCache(maxsize=128)
     )
-    client: hishel.CacheClient = attrs.field(factory=hishel.CacheClient)
+    client: SyncCacheClient = attrs.field(factory=SyncCacheClient)
 
     def __call__(
         self,
