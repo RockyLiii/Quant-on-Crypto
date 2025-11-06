@@ -7,7 +7,7 @@ from ._account import (
 )
 from ._account_config import AccountConfig
 from ._commission_rate import CommissionRate
-from ._enum import MarginType, OrderSide
+from ._enum import MarginType, OrderSide, PositionSide
 from ._exchange_info import ExchangeInfo, ExchangeInfoSymbol, ExchangeInfoSymbolDict
 from ._order import OrderResponse
 from ._symbol_config import SymbolConfig, SymbolConfigDict
@@ -30,6 +30,7 @@ __all__ = [
     "MarketLotSize",
     "OrderResponse",
     "OrderSide",
+    "PositionSide",
     "SymbolConfig",
     "SymbolConfigDict",
     "SymbolFilter",

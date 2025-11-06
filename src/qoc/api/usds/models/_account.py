@@ -6,6 +6,7 @@ from pydantic_extra_types.pendulum_dt import DateTime
 from qoc.typing import AssetName, SymbolName
 
 from ._base import BaseModel
+from ._enum import PositionSide
 from ._mixin import DictMixin
 
 
@@ -14,6 +15,7 @@ class AccountAsset(BaseModel):
     wallet_balance: float
     unrealized_profit: float
     margin_balance: float
+    available_balance: float
     update_time: DateTime
 
 
@@ -33,7 +35,7 @@ class AccountAssetsDict(
 
 class AccountPosition(BaseModel):
     symbol: SymbolName
-    position_side: str
+    position_side: PositionSide
     position_amt: float
     unrealized_profit: float
     isolated_margin: float

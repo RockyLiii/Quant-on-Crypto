@@ -91,7 +91,7 @@ class ApiUsdsOnline(ApiUsds):
     def klines(
         self,
         symbol: SymbolName,
-        interval: str,
+        interval: str,  # TODO(liblaf): use enum
         start_time: pendulum.DateTime | None = None,
         end_time: pendulum.DateTime | None = None,
         limit: int | None = None,
