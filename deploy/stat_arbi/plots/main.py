@@ -61,22 +61,71 @@ class TimeSeriesData:
 
 @attrs.define
 class StrategyRev:
-    symbols: list[Symbol] = attrs.field(factory=lambda: [
-        "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT",
-        "LINKUSDT", "TRXUSDT", "DOTUSDT", "MATICUSDT", "LTCUSDT", "UNIUSDT", "ATOMUSDT", "ETCUSDT",
-        "ICPUSDT", "APTUSDT", "FILUSDT", "NEARUSDT", "HBARUSDT", "INJUSDT", "OPUSDT", "ARBUSDT",
-        "SUIUSDT", "SEIUSDT", "RENDERUSDT", "TIAUSDT", "FTMUSDT", "EGLDUSDT", "AAVEUSDT", "GALAUSDT",
-        "IMXUSDT", "PEPEUSDT", "SHIBUSDT", "FLOKIUSDT", "BONKUSDT", "WIFUSDT", "PENGUUSDT", "TRUMPUSDT",
-        "POLUSDT", "ENSUSDT", "JUPUSDT", "PYTHUSDT", "ORDIUSDT", "SATOSHIUSDT", "SATSUSDT", "MOVRUSDT",
-        "DYMUSDT", "NOTUSDT", "MAGAUSDT", "SPXUSDT"
-    ])
+    symbols: list[Symbol] = attrs.field(
+        factory=lambda: [
+            "BTCUSDT",
+            "ETHUSDT",
+            "BNBUSDT",
+            "SOLUSDT",
+            "XRPUSDT",
+            "ADAUSDT",
+            "DOGEUSDT",
+            "AVAXUSDT",
+            "LINKUSDT",
+            "TRXUSDT",
+            "DOTUSDT",
+            "MATICUSDT",
+            "LTCUSDT",
+            "UNIUSDT",
+            "ATOMUSDT",
+            "ETCUSDT",
+            "ICPUSDT",
+            "APTUSDT",
+            "FILUSDT",
+            "NEARUSDT",
+            "HBARUSDT",
+            "INJUSDT",
+            "OPUSDT",
+            "ARBUSDT",
+            "SUIUSDT",
+            "SEIUSDT",
+            "RENDERUSDT",
+            "TIAUSDT",
+            "FTMUSDT",
+            "EGLDUSDT",
+            "AAVEUSDT",
+            "GALAUSDT",
+            "IMXUSDT",
+            "PEPEUSDT",
+            "SHIBUSDT",
+            "FLOKIUSDT",
+            "BONKUSDT",
+            "WIFUSDT",
+            "PENGUUSDT",
+            "TRUMPUSDT",
+            "POLUSDT",
+            "ENSUSDT",
+            "JUPUSDT",
+            "PYTHUSDT",
+            "ORDIUSDT",
+            "SATOSHIUSDT",
+            "SATSUSDT",
+            "MOVRUSDT",
+            "DYMUSDT",
+            "NOTUSDT",
+            "MAGAUSDT",
+            "SPXUSDT",
+        ]
+    )
 
     # -------------------------------- Config -------------------------------- #
 
     back_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=200))
     """过去窗口"""
 
-    forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=200))
+    forward_window: Duration = attrs.field(
+        factory=lambda: pendulum.duration(minutes=200)
+    )
     """持有期"""
 
     bullet_size: float = 100
@@ -162,7 +211,7 @@ class StrategyRev:
     stats_7: list[float] = attrs.field(factory=list)  # corr_3_mean
     stats_8: list[float] = attrs.field(factory=list)  # cmi_mean
     stats_9: list[float] = attrs.field(factory=list)  # cmi_std
-    stats_10: list[float] = attrs.field(factory=list) # amihud_mean
+    stats_10: list[float] = attrs.field(factory=list)  # amihud_mean
 
     # Other tracking variables
     num_trades: int = 0
@@ -179,7 +228,7 @@ class StrategyRev:
         for symbol in self.symbols:
             self.coin_closes[symbol] = deque(maxlen=self.back_window_size)
             self.coin_volumes[symbol] = deque(maxlen=self.back_window_size)
-            
+
             # Statistical calculation deques
             self.xy_1[symbol] = deque(maxlen=self.back_window_size)
             self.xx_1[symbol] = deque(maxlen=self.back_window_size)
@@ -196,11 +245,11 @@ class StrategyRev:
             self.yy_3[symbol] = deque(maxlen=self.back_window_size)
             self.x_3[symbol] = deque(maxlen=self.back_window_size)
             self.y_3[symbol] = deque(maxlen=self.back_window_size)
-            
+
             # Amihud liquidity measure
             self.amihud[symbol] = deque(maxlen=self.back_window_size)
             self.amihud_avg[symbol] = 0.0
-            
+
             # Sum variables
             self.xy_1_sum[symbol] = 0.0
             self.xx_1_sum[symbol] = 0.0
@@ -217,7 +266,7 @@ class StrategyRev:
             self.yy_3_sum[symbol] = 0.0
             self.x_3_sum[symbol] = 0.0
             self.y_3_sum[symbol] = 0.0
-            
+
             # Revenue tracking
             self.coin_revenues[symbol] = []
 
@@ -260,38 +309,62 @@ class StrategyRev:
             # Calculate market indices
             if len(self.btc_close) >= 2:
                 self.mkt_idx_1.append(self.btc_close[-1])
-                self.mkt_idx_2.append(self.btc_close[-2] if len(self.btc_close) >= 2 else self.btc_close[-1])
-                
+                self.mkt_idx_2.append(
+                    self.btc_close[-2]
+                    if len(self.btc_close) >= 2
+                    else self.btc_close[-1]
+                )
+
                 # Calculate market index 3 (volume-weighted growth)
                 fz = 0
                 fm = 0
                 for symbol in self.symbols:
                     if len(self.coin_closes[symbol]) >= 2:
-                        growth = self.coin_closes[symbol][-1] - self.coin_closes[symbol][-2]
+                        growth = (
+                            self.coin_closes[symbol][-1] - self.coin_closes[symbol][-2]
+                        )
                         fz += growth * symbol_data[symbol]["volume"]
-                        fm += symbol_data[symbol]["volume"] * symbol_data[symbol]["price"]
-                
+                        fm += (
+                            symbol_data[symbol]["volume"] * symbol_data[symbol]["price"]
+                        )
+
                 if fm != 0:
                     self.mkt_idx_3.append(fz / fm)
                 else:
                     self.mkt_idx_3.append(0)
 
                 # Calculate market index differences
-                mkt_idx_1_diff = self.mkt_idx_1[-1] - self.mkt_idx_1[-2] if len(self.mkt_idx_1) >= 2 else 0
-                mkt_idx_2_diff = self.mkt_idx_2[-1] - self.mkt_idx_2[-2] if len(self.mkt_idx_2) >= 2 else 0
+                mkt_idx_1_diff = (
+                    self.mkt_idx_1[-1] - self.mkt_idx_1[-2]
+                    if len(self.mkt_idx_1) >= 2
+                    else 0
+                )
+                mkt_idx_2_diff = (
+                    self.mkt_idx_2[-1] - self.mkt_idx_2[-2]
+                    if len(self.mkt_idx_2) >= 2
+                    else 0
+                )
                 mkt_idx_3_diff = self.mkt_idx_3[-1] if len(self.mkt_idx_3) >= 1 else 0
 
                 # Update statistical measures for each symbol
                 coef_records = {}
                 for symbol in self.symbols:
                     if len(self.coin_closes[symbol]) >= 2:
-                        growth = self.coin_closes[symbol][-1] - self.coin_closes[symbol][-2]
-                        
+                        growth = (
+                            self.coin_closes[symbol][-1] - self.coin_closes[symbol][-2]
+                        )
+
                         # Calculate CMI (Cumulative Market Index)
                         closes_array = np.array(list(self.coin_closes[symbol]))
                         if len(closes_array) > 1:
                             diff = np.diff(closes_array)
-                            cmi = (closes_array[-1] - closes_array[0]) / np.sum(np.abs(diff)) * 100 if np.sum(np.abs(diff)) != 0 else 0
+                            cmi = (
+                                (closes_array[-1] - closes_array[0])
+                                / np.sum(np.abs(diff))
+                                * 100
+                                if np.sum(np.abs(diff)) != 0
+                                else 0
+                            )
                         else:
                             cmi = 0
 
@@ -302,37 +375,40 @@ class StrategyRev:
                             self.yy_1_sum[symbol] -= self.yy_1[symbol][0]
                             self.x_1_sum[symbol] -= self.x_1[symbol][0]
                             self.y_1_sum[symbol] -= self.y_1[symbol][0]
-                            
+
                             self.xy_2_sum[symbol] -= self.xy_2[symbol][0]
                             self.xx_2_sum[symbol] -= self.xx_2[symbol][0]
                             self.yy_2_sum[symbol] -= self.yy_2[symbol][0]
                             self.x_2_sum[symbol] -= self.x_2[symbol][0]
                             self.y_2_sum[symbol] -= self.y_2[symbol][0]
-                            
+
                             self.xy_3_sum[symbol] -= self.xy_3[symbol][0]
                             self.xx_3_sum[symbol] -= self.xx_3[symbol][0]
                             self.yy_3_sum[symbol] -= self.yy_3[symbol][0]
                             self.x_3_sum[symbol] -= self.x_3[symbol][0]
                             self.y_3_sum[symbol] -= self.y_3[symbol][0]
-                            
-                            self.amihud_avg[symbol] = (self.amihud_avg[symbol] * self.back_window_size - self.amihud[symbol][0]) / self.back_window_size
+
+                            self.amihud_avg[symbol] = (
+                                self.amihud_avg[symbol] * self.back_window_size
+                                - self.amihud[symbol][0]
+                            ) / self.back_window_size
 
                         # Add new values
                         xy_1_val = growth * mkt_idx_1_diff
-                        xx_1_val = mkt_idx_1_diff ** 2
-                        yy_1_val = growth ** 2
+                        xx_1_val = mkt_idx_1_diff**2
+                        yy_1_val = growth**2
                         x_1_val = mkt_idx_1_diff
                         y_1_val = growth
-                        
+
                         xy_2_val = growth * mkt_idx_2_diff
-                        xx_2_val = mkt_idx_2_diff ** 2
-                        yy_2_val = growth ** 2
+                        xx_2_val = mkt_idx_2_diff**2
+                        yy_2_val = growth**2
                         x_2_val = mkt_idx_2_diff
                         y_2_val = growth
-                        
+
                         xy_3_val = growth * mkt_idx_3_diff
-                        xx_3_val = mkt_idx_3_diff ** 2
-                        yy_3_val = growth ** 2
+                        xx_3_val = mkt_idx_3_diff**2
+                        yy_3_val = growth**2
                         x_3_val = mkt_idx_3_diff
                         y_3_val = growth
 
@@ -353,7 +429,12 @@ class StrategyRev:
                         self.y_3[symbol].append(y_3_val)
 
                         # Calculate and append Amihud illiquidity measure
-                        amihud_val = abs(growth) / (symbol_data[symbol]["volume"] + 1e-9) / symbol_data[symbol]["price"] / symbol_data[symbol]["price"]
+                        amihud_val = (
+                            abs(growth)
+                            / (symbol_data[symbol]["volume"] + 1e-9)
+                            / symbol_data[symbol]["price"]
+                            / symbol_data[symbol]["price"]
+                        )
                         self.amihud[symbol].append(amihud_val)
 
                         # Update sums
@@ -373,56 +454,114 @@ class StrategyRev:
                         self.x_3_sum[symbol] += x_3_val
                         self.y_3_sum[symbol] += y_3_val
 
-                        self.amihud_avg[symbol] = (self.amihud_avg[symbol] * self.back_window_size + amihud_val) / self.back_window_size
+                        self.amihud_avg[symbol] = (
+                            self.amihud_avg[symbol] * self.back_window_size + amihud_val
+                        ) / self.back_window_size
 
                         # Calculate coefficients and correlations if we have enough data
                         if self.current_step >= 2 * self.back_window_size:
-                            coef_1 = self.xy_1_sum[symbol] / self.xx_1_sum[symbol] * 1000 if self.xx_1_sum[symbol] != 0 else 0
-                            coef_2 = self.xy_2_sum[symbol] / self.xx_2_sum[symbol] * 1000 if self.xx_2_sum[symbol] != 0 else 0
-                            coef_3 = self.xy_3_sum[symbol] / self.xx_3_sum[symbol] * 1000 if self.xx_3_sum[symbol] != 0 else 0
+                            coef_1 = (
+                                self.xy_1_sum[symbol] / self.xx_1_sum[symbol] * 1000
+                                if self.xx_1_sum[symbol] != 0
+                                else 0
+                            )
+                            coef_2 = (
+                                self.xy_2_sum[symbol] / self.xx_2_sum[symbol] * 1000
+                                if self.xx_2_sum[symbol] != 0
+                                else 0
+                            )
+                            coef_3 = (
+                                self.xy_3_sum[symbol] / self.xx_3_sum[symbol] * 1000
+                                if self.xx_3_sum[symbol] != 0
+                                else 0
+                            )
 
                             # Calculate correlations
-                            denom_1 = (self.back_window_size * self.xx_1_sum[symbol] - self.x_1_sum[symbol]**2) * (self.back_window_size * self.yy_1_sum[symbol] - self.y_1_sum[symbol]**2)
-                            corr_1 = (self.back_window_size * self.xy_1_sum[symbol] - self.x_1_sum[symbol] * self.y_1_sum[symbol]) / np.sqrt(denom_1) if denom_1 > 0 else 0
+                            denom_1 = (
+                                self.back_window_size * self.xx_1_sum[symbol]
+                                - self.x_1_sum[symbol] ** 2
+                            ) * (
+                                self.back_window_size * self.yy_1_sum[symbol]
+                                - self.y_1_sum[symbol] ** 2
+                            )
+                            corr_1 = (
+                                (
+                                    self.back_window_size * self.xy_1_sum[symbol]
+                                    - self.x_1_sum[symbol] * self.y_1_sum[symbol]
+                                )
+                                / np.sqrt(denom_1)
+                                if denom_1 > 0
+                                else 0
+                            )
 
-                            denom_2 = (self.back_window_size * self.xx_2_sum[symbol] - self.x_2_sum[symbol]**2) * (self.back_window_size * self.yy_2_sum[symbol] - self.y_2_sum[symbol]**2)
-                            corr_2 = (self.back_window_size * self.xy_2_sum[symbol] - self.x_2_sum[symbol] * self.y_2_sum[symbol]) / np.sqrt(denom_2) if denom_2 > 0 else 0
+                            denom_2 = (
+                                self.back_window_size * self.xx_2_sum[symbol]
+                                - self.x_2_sum[symbol] ** 2
+                            ) * (
+                                self.back_window_size * self.yy_2_sum[symbol]
+                                - self.y_2_sum[symbol] ** 2
+                            )
+                            corr_2 = (
+                                (
+                                    self.back_window_size * self.xy_2_sum[symbol]
+                                    - self.x_2_sum[symbol] * self.y_2_sum[symbol]
+                                )
+                                / np.sqrt(denom_2)
+                                if denom_2 > 0
+                                else 0
+                            )
 
-                            denom_3 = (self.back_window_size * self.xx_3_sum[symbol] - self.x_3_sum[symbol]**2) * (self.back_window_size * self.yy_3_sum[symbol] - self.y_3_sum[symbol]**2)
-                            corr_3 = (self.back_window_size * self.xy_3_sum[symbol] - self.x_3_sum[symbol] * self.y_3_sum[symbol]) / np.sqrt(denom_3) if denom_3 > 0 else 0
+                            denom_3 = (
+                                self.back_window_size * self.xx_3_sum[symbol]
+                                - self.x_3_sum[symbol] ** 2
+                            ) * (
+                                self.back_window_size * self.yy_3_sum[symbol]
+                                - self.y_3_sum[symbol] ** 2
+                            )
+                            corr_3 = (
+                                (
+                                    self.back_window_size * self.xy_3_sum[symbol]
+                                    - self.x_3_sum[symbol] * self.y_3_sum[symbol]
+                                )
+                                / np.sqrt(denom_3)
+                                if denom_3 > 0
+                                else 0
+                            )
 
                             coef_records[symbol] = {
-                                'coef_1': coef_1,
-                                'coef_2': coef_2,
-                                'coef_3': coef_3,
-                                'corr_1': corr_1,
-                                'corr_2': corr_2,
-                                'corr_3': corr_3,
-                                'cmi': cmi,
-                                'amihud': self.amihud_avg[symbol],
+                                "coef_1": coef_1,
+                                "coef_2": coef_2,
+                                "coef_3": coef_3,
+                                "corr_1": corr_1,
+                                "corr_2": corr_2,
+                                "corr_3": corr_3,
+                                "cmi": cmi,
+                                "amihud": self.amihud_avg[symbol],
                             }
 
                 # Portfolio optimization and trading logic
                 if self.current_step >= 2 * self.back_window_size and coef_records:
                     try:
                         # Convert to DataFrame
-                        coef_df = pd.DataFrame.from_dict(coef_records, orient='index')
-                        
+                        coef_df = pd.DataFrame.from_dict(coef_records, orient="index")
+
                         # Calculate means
-                        coef_1_mean = coef_df['coef_1'].mean()
-                        coef_2_mean = coef_df['coef_2'].mean()
-                        coef_3_mean = coef_df['coef_3'].mean()
-                        corr_1_mean = coef_df['corr_1'].mean()
-                        corr_2_mean = coef_df['corr_2'].mean()
-                        corr_3_mean = coef_df['corr_3'].mean()
-                        cmi_mean = coef_df['cmi'].mean()
-                        cmi_std = coef_df['cmi'].std()
-                        amihud_mean = coef_df['amihud'].mean()
+                        coef_1_mean = coef_df["coef_1"].mean()
+                        coef_2_mean = coef_df["coef_2"].mean()
+                        coef_3_mean = coef_df["coef_3"].mean()
+                        corr_1_mean = coef_df["corr_1"].mean()
+                        corr_2_mean = coef_df["corr_2"].mean()
+                        corr_3_mean = coef_df["corr_3"].mean()
+                        cmi_mean = coef_df["cmi"].mean()
+                        cmi_std = coef_df["cmi"].std()
+                        amihud_mean = coef_df["amihud"].mean()
 
                         names = coef_df.index.tolist()
-                        coef1 = coef_df['coef_1'].values.astype(float)
-                        prices = np.array([symbol_data[symbol]["price"] for symbol in names])
-                        cmis = coef_df['cmi'].values.astype(float)
+                        coef1 = coef_df["coef_1"].values.astype(float)
+                        prices = np.array(
+                            [symbol_data[symbol]["price"] for symbol in names]
+                        )
+                        cmis = coef_df["cmi"].values.astype(float)
 
                         k = len(prices)
 
@@ -461,24 +600,45 @@ class StrategyRev:
                         bounds = [(-np.inf, np.inf)] * k + [(0, np.inf)] * k
 
                         # Solve optimization
-                        res = linprog(c=c, A_eq=A_eq, b_eq=b_eq, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
+                        res = linprog(
+                            c=c,
+                            A_eq=A_eq,
+                            b_eq=b_eq,
+                            A_ub=A_ub,
+                            b_ub=b_ub,
+                            bounds=bounds,
+                            method="highs",
+                        )
 
                         objective_value = res.fun
 
                         # Check trading conditions
-                        if (res.success and corr_2_mean > 0.1 and corr_1_mean > 0.6 and 
-                            cmi_std < 6 and objective_value < -7500 and abs(cmi_mean) < 10):
-                            
+                        if (
+                            res.success
+                            and corr_2_mean > 0.1
+                            and corr_1_mean > 0.6
+                            and cmi_std < 6
+                            and objective_value < -7500
+                            and abs(cmi_mean) < 10
+                        ):
                             theta = res.x[:k]
-                            
+
                             # Execute trades based on theta values
                             for i, symbol in enumerate(names):
-                                if abs(theta[i]) > 0.001:  # Only trade if position is significant
+                                if (
+                                    abs(theta[i]) > 0.001
+                                ):  # Only trade if position is significant
                                     quantity = abs(theta[i])
-                                    side = OrderSide.BUY if theta[i] > 0 else OrderSide.SELL
-                                    
+                                    side = (
+                                        OrderSide.BUY
+                                        if theta[i] > 0
+                                        else OrderSide.SELL
+                                    )
+
                                     try:
-                                        response = api.order_market(symbol, side, quantity=quantity)
+                                        response = api.order_market(
+                                            symbol, side, quantity=quantity
+                                        )
                                         self.orders[symbol].append(
                                             Order(
                                                 quantity=response.executed_qty,
@@ -486,9 +646,13 @@ class StrategyRev:
                                                 time=response.transact_time,
                                             )
                                         )
-                                        logger.info(f"Executed {side} order for {symbol}: {quantity}")
+                                        logger.info(
+                                            f"Executed {side} order for {symbol}: {quantity}"
+                                        )
                                     except Exception as e:
-                                        logger.error(f"Failed to execute order for {symbol}: {e}")
+                                        logger.error(
+                                            f"Failed to execute order for {symbol}: {e}"
+                                        )
 
                             # Update statistics
                             self.num_trades += 1
@@ -506,7 +670,9 @@ class StrategyRev:
                             self.sum_of_theta_price += sum(abs(theta * prices))
 
                             # Store metrics in time series
-                            self.time_series.add_metric("objective_value", now, objective_value)
+                            self.time_series.add_metric(
+                                "objective_value", now, objective_value
+                            )
                             self.time_series.add_metric("corr_1_mean", now, corr_1_mean)
                             self.time_series.add_metric("corr_2_mean", now, corr_2_mean)
                             self.time_series.add_metric("cmi_std", now, cmi_std)
@@ -521,8 +687,12 @@ class StrategyRev:
                 order = orders.popleft()
                 try:
                     # Close position
-                    opposite_side = OrderSide.SELL if order.quantity > 0 else OrderSide.BUY
-                    api.order_market(order.symbol, opposite_side, quantity=abs(order.quantity))
+                    opposite_side = (
+                        OrderSide.SELL if order.quantity > 0 else OrderSide.BUY
+                    )
+                    api.order_market(
+                        order.symbol, opposite_side, quantity=abs(order.quantity)
+                    )
                     logger.info(f"Closed position for {order.symbol}")
                 except Exception as e:
                     logger.error(f"Failed to close position for {order.symbol}: {e}")

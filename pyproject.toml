@@ -27,11 +27,12 @@ classifiers = [
 dependencies = [
   "arcticdb>=6,<7",
   "attrs>=25,<26",
+  "binance-common>=3,<4",
   "binance-connector>=3,<4",
-  "binance-sdk-derivatives-trading-usds-futures>=1,<2",
+  "binance-sdk-derivatives-trading-usds-futures>=2,<3",
   "cachetools>=6,<7",
   "environs>=14,<15",
-  "hishel>=0.1.3",
+  "hishel>=1,<2",
   "httpx[socks]>=0.28,<0.29",
   "jaxtyping>=0.3,<0.4",
   "lazy-loader>=0.4,<0.5",
@@ -51,7 +52,7 @@ dependencies = [
   "scipy>=1,<2",
   "seaborn>=0.13,<0.14",
   "torch>=2,<3",
-  "tqdm>=4,<5"
+  "tqdm>=4,<5",
 ]
 dynamic = ["version"]
 

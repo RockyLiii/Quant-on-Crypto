@@ -16,42 +16,20 @@ ci:
     # `biome.jsonc` may extend from an NPM package.
     # `additional_dependencies` won't work in this case.
     - biome-check
-    - dvc-post-checkout
-    - dvc-pre-commit
-    - dvc-pre-push
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.10
+    rev: v0.14.2
     hooks:
       - id: ruff-check
         args:
           - --fix
       - id: ruff-format
   - repo: https://github.com/biomejs/pre-commit
-    rev: v2.2.0
+    rev: v2.3.1
     hooks:
       - id: biome-check
         exclude: \.jsonc?$
-  - repo: https://github.com/iterative/dvc
-    rev: 3.62.0
-    hooks:
-      - id: dvc-post-checkout
-        always_run: true
-        stages:
-          - post-checkout
-        additional_dependencies:
-          - .[all]
-      - id: dvc-pre-commit
-        stages:
-          - pre-commit
-        additional_dependencies:
-          - .[all]
-      - id: dvc-pre-push
-        stages:
-          - pre-push
-        additional_dependencies:
-          - .[all]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -72,8 +50,3 @@ repos:
       - id: shellcheck
         args:
           - --exclude=SC1091
-
-default_install_hook_types:
-  - post-checkout
-  - pre-commit
-  - pre-push
