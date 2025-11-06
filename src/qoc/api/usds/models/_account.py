@@ -25,12 +25,10 @@ class AccountAssetsDict(
 ):
     @pydantic.model_validator(mode="before")
     @classmethod
-    def _validate_dict(
-        cls, value: list[dict[str, Any]]
-    ) -> dict[AssetName, dict[str, Any]]:
-        if not isinstance(value, list):
-            raise ValueError  # noqa: TRY004
-        return {item["asset"]: item for item in value}
+    def _validate_dict(cls, value: Any) -> dict[AssetName, dict[str, Any]]:
+        if isinstance(value, list):
+            return {item["asset"]: item for item in value}
+        return value
 
 
 class AccountPosition(BaseModel):
@@ -50,12 +48,10 @@ class AccountPositionsDict(
 ):
     @pydantic.model_validator(mode="before")
     @classmethod
-    def _validate_dict(
-        cls, value: list[dict[str, Any]]
-    ) -> dict[AssetName, dict[str, Any]]:
-        if not isinstance(value, list):
-            raise ValueError  # noqa: TRY004
-        return {item["symbol"]: item for item in value}
+    def _validate_dict(cls, value: Any) -> dict[AssetName, dict[str, Any]]:
+        if isinstance(value, list):
+            return {item["symbol"]: item for item in value}
+        return value
 
 
 class Account(BaseModel):

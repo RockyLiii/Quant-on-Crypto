@@ -1,4 +1,4 @@
-import math
+import functools
 from typing import Any, overload, override
 
 import attrs
@@ -21,7 +21,6 @@ from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     ChangeMarginTypeMarginTypeEnum,
     ExchangeInformationResponse,
     FuturesAccountConfigurationResponse,
-    KlineCandlestickDataIntervalEnum,
     NewOrderResponse,
     NewOrderSideEnum,
     SymbolPriceTickerV2Response,
@@ -33,6 +32,7 @@ from environs import env
 from loguru import logger
 
 from qoc import utils
+from qoc.api.binance.futures._klines import FuturesKlinesCache
 from qoc.api.usds._abc import ApiUsds
 from qoc.api.usds.models import (
     Account,
@@ -65,6 +65,8 @@ class ApiUsdsOnline(ApiUsds):
                     prod=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL,
                     testnet=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL,
                 ),
+                timeout=5,  # seconds
+                backoff=1,  # seconds
             )
         )
         self.__attrs_init__(wrapped=wrapped)  # pyright: ignore[reportAttributeAccessIssue]
@@ -96,34 +98,14 @@ class ApiUsdsOnline(ApiUsds):
         end_time: pendulum.DateTime | None = None,
         limit: int | None = None,
     ) -> pl.DataFrame:
-        # TODO(liblaf): implement caching
-        # All time and timestamp related fields are in milliseconds.
-        response: list[list[Any]] = self.rest.kline_candlestick_data(
-            symbol=symbol,
-            interval=KlineCandlestickDataIntervalEnum(interval),
-            start_time=math.floor(start_time.timestamp() * 1e3) if start_time else None,
-            end_time=math.ceil(end_time.timestamp() * 1e3) if end_time else None,
-            limit=limit,
-        ).data()  # pyright: ignore[reportAssignmentType]
-        data: pl.DataFrame = pl.from_records(
-            response,
-            [
-                ("open_time", pl.Datetime("ms", pendulum.UTC)),
-                ("open", pl.Float64),
-                ("high", pl.Float64),
-                ("low", pl.Float64),
-                ("close", pl.Float64),
-                ("volume", pl.Float64),
-                ("close_time", pl.Datetime("ms", pendulum.UTC)),
-                ("quote_asset_volume", pl.Float64),
-                ("number_of_trades", pl.Int64),
-                ("taker_buy_base_asset_volume", pl.Float64),
-                ("taker_buy_quote_asset_volume", pl.Float64),
-                ("ignore", pl.String),
-            ],
-            orient="row",
+        # TODO(liblaf): better caching mechanism
+        return self._klines_cache(
+            symbol, interval, start_time=start_time, end_time=end_time, limit=limit
         )
-        return data
+
+    @functools.cached_property
+    def _klines_cache(self) -> FuturesKlinesCache:
+        return FuturesKlinesCache(client=self.rest)
 
     @overload
     def ticker_price(self, symbol: str) -> TickerPrice: ...

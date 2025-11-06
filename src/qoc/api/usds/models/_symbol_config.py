@@ -22,9 +22,7 @@ class SymbolConfigDict(
 ):
     @pydantic.model_validator(mode="before")
     @classmethod
-    def _validate_root(
-        cls, value: list[dict[str, Any]]
-    ) -> dict[SymbolName, dict[str, Any]]:
-        if not isinstance(value, list):
-            raise ValueError  # noqa: TRY004
-        return {get(item, "symbol"): item for item in value}
+    def _validate_root(cls, value: Any) -> dict[SymbolName, dict[str, Any]]:
+        if isinstance(value, list):
+            return {get(item, "symbol"): item for item in value}
+        return value

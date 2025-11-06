@@ -113,6 +113,7 @@ class ApiUsdsOffline(ApiUsds):
     def order_market(
         self, symbol: SymbolName, side: OrderSide, quantity: DecimalLike
     ) -> OrderResponse:
+        now: DateTime = tu.now()
         info: ExchangeInfoSymbol = self.exchange_info().symbols[symbol]
         if (market_lot_size := info.market_lot_size) is not None:
             quantity = market_lot_size.round(quantity)
@@ -132,12 +133,20 @@ class ApiUsdsOffline(ApiUsds):
             symbol,
             Position(symbol=symbol, position_amt=Decimal(0), isolated_wallet=0.0),
         )
-        asset.available_balance -= notional
+        commission_rate: float = self.commission_rate(symbol).taker
+        commission: float = commission_rate * abs(notional)
+        asset.available_balance -= notional + commission
         position.position_amt += quantity
         position.isolated_wallet += notional
         self._assets[info.quote_asset] = asset
         self._positions[symbol] = position
-        return OrderResponse()
+        return OrderResponse(
+            orig_qty=quantity,
+            side=side,
+            position_side=PositionSide.BOTH,
+            symbol=symbol,
+            update_time=now,  # pyright: ignore[reportArgumentType]
+        )
 
     @override
     def change_margin_type(self, symbol: SymbolName, margin_type: MarginType) -> None:
