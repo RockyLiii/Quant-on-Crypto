@@ -65,7 +65,7 @@ class ApiUsdsOnline(ApiUsds):
                     prod=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL,
                     testnet=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL,
                 ),
-                timeout=5,  # seconds
+                timeout=5000,  # milliseconds
                 backoff=1,  # seconds
             )
         )
