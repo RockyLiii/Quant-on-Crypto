@@ -24,7 +24,7 @@ from .typing import (
     OrderTypeLike,
     Symbol,
 )
-from .usds import ApiUSDSOnline
+from .usds import ApiUsdsOnline
 from .utils import GeoIP, GeoIPLocation, geoip, get_time_unit, klines_schema
 
 __all__ = [
@@ -36,7 +36,7 @@ __all__ = [
     "ApiOffline",
     "ApiOfflineFutures",
     "ApiOfflineSpot",
-    "ApiUSDSOnline",
+    "ApiUsdsOnline",
     "Asset",
     "Balance",
     "BaseModel",

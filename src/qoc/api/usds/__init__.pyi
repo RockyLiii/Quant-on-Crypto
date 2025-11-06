@@ -1,4 +1,5 @@
-from . import models, online
+from . import models, offline, online
+from ._abc import ApiUsds
 from .models import (
     ExchangeInfo,
     ExchangeInfoSymbol,
@@ -8,10 +9,13 @@ from .models import (
     SymbolFilterBase,
     TickerPrice,
 )
-from .online import ApiUSDSOnline
+from .offline import ApiUsdsOffline
+from .online import ApiUsdsOnline
 
 __all__ = [
-    "ApiUSDSOnline",
+    "ApiUsds",
+    "ApiUsdsOffline",
+    "ApiUsdsOnline",
     "ExchangeInfo",
     "ExchangeInfoSymbol",
     "LotSize",
@@ -20,5 +24,6 @@ __all__ = [
     "SymbolFilterBase",
     "TickerPrice",
     "models",
+    "offline",
     "online",
 ]

@@ -1,3 +1,3 @@
-from ._main import ApiUSDSOnline
+from ._main import ApiUsdsOnline
 
-__all__ = ["ApiUSDSOnline"]
+__all__ = ["ApiUsdsOnline"]

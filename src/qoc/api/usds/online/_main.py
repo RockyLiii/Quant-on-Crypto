@@ -1,5 +1,5 @@
 import math
-from typing import Any, overload
+from typing import Any, overload, override
 
 import attrs
 import cachetools
@@ -27,17 +27,21 @@ from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     SymbolPriceTickerV2Response,
     SymbolPriceTickerV2Response1,
     SymbolPriceTickerV2Response2,
+    UserCommissionRateResponse,
 )
 from environs import env
 from loguru import logger
 
 from qoc import utils
+from qoc.api.usds._abc import ApiUsds
 from qoc.api.usds.models import (
     Account,
     AccountConfig,
+    CommissionRate,
     ExchangeInfo,
     ExchangeInfoSymbol,
     MarginType,
+    OrderResponse,
     OrderSide,
     SymbolConfig,
     SymbolConfigDict,
@@ -48,7 +52,7 @@ from qoc.typing import DecimalLike, SymbolName
 
 
 @attrs.define
-class ApiUSDSOnline:
+class ApiUsdsOnline(ApiUsds):
     wrapped: DerivativesTradingUsdsFutures
 
     def __init__(self) -> None:
@@ -75,6 +79,7 @@ class ApiUSDSOnline:
         init=False, factory=lambda: cachetools.TTLCache(maxsize=1, ttl=3600)
     )
 
+    @override
     @cachetools.cachedmethod(lambda self: self._exchange_info_cache)
     def exchange_info(self) -> ExchangeInfo:
         response: ExchangeInformationResponse = self.rest.exchange_information().data()
@@ -82,6 +87,7 @@ class ApiUSDSOnline:
             response.model_dump(mode="json", by_alias=True)
         )
 
+    @override
     def klines(
         self,
         symbol: SymbolName,
@@ -123,6 +129,7 @@ class ApiUSDSOnline:
     def ticker_price(self, symbol: str) -> TickerPrice: ...
     @overload
     def ticker_price(self, symbol: None = None) -> TickerPriceDict: ...
+    @override
     def ticker_price(self, symbol: str | None = None) -> TickerPrice | TickerPriceDict:
         # TODO(liblaf): implement caching
         response: SymbolPriceTickerV2Response = self.rest.symbol_price_ticker_v2(
@@ -145,9 +152,10 @@ class ApiUSDSOnline:
 
     # --------------------------------- Trade -------------------------------- #
 
+    @override
     def order_market(
         self, symbol: SymbolName, side: OrderSide, quantity: DecimalLike
-    ) -> NewOrderResponse:
+    ) -> OrderResponse:
         info: ExchangeInfoSymbol = self.exchange_info().symbols[symbol]
         if (market_lot_size := info.market_lot_size) is not None:
             quantity = market_lot_size.round(quantity)
@@ -157,7 +165,9 @@ class ApiUSDSOnline:
             type="MARKET",
             quantity=str(quantity),  # pyright: ignore[reportArgumentType]
         ).data()
-        return response
+        return OrderResponse.model_validate(
+            response.model_dump(mode="json", by_alias=True)
+        )
 
     def change_margin_type(self, symbol: SymbolName, margin_type: MarginType) -> None:
         symbol_config: SymbolConfig = self.symbol_config(symbol)
@@ -169,6 +179,7 @@ class ApiUSDSOnline:
             "change margin type > symbol: {}, margin type: {}", symbol, margin_type
         )
 
+    @override
     def change_position_mode(self, *, dual_side_position: bool) -> None:
         config: AccountConfig = self.account_config()
         if config.dual_side_position != dual_side_position:
@@ -178,12 +189,14 @@ class ApiUSDSOnline:
             "hedge mode" if dual_side_position else "one-way mode",
         )
 
+    @override
     def change_leverage(self, symbol: str, leverage: int) -> None:
         symbol_config: SymbolConfig = self.symbol_config(symbol)
         if symbol_config.leverage != leverage:
             self.rest.change_initial_leverage(symbol, leverage)
         logger.success("change leverage > symbol: {}, leverage: {}", symbol, leverage)
 
+    @override
     def change_multi_assets_mode(self, *, multi_assets_margin: bool) -> None:
         config: AccountConfig = self.account_config()
         if config.multi_assets_margin != multi_assets_margin:
@@ -197,11 +210,21 @@ class ApiUSDSOnline:
 
     # -------------------------------- Account ------------------------------- #
 
+    @override
     def account(self) -> Account:
         response: AccountInformationV3Response = (
             self.rest.account_information_v3().data()
         )
         return Account.model_validate(response.model_dump(mode="json", by_alias=True))
+
+    @override
+    def commission_rate(self, symbol: SymbolName) -> CommissionRate:
+        response: UserCommissionRateResponse = self.rest.user_commission_rate(
+            symbol
+        ).data()
+        return CommissionRate.model_validate(
+            response.model_dump(mode="json", by_alias=True)
+        )
 
     def account_config(self) -> AccountConfig:
         response: FuturesAccountConfigurationResponse = (
