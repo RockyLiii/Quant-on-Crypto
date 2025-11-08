@@ -113,9 +113,9 @@ class FuturesKlinesCache:
     ) -> pl.DataFrame:
         key = CacheKey(symbol, interval, start, end)
         if key in self.cache:
-            logger.trace("klines cache hit: {}", key)
+            # logger.trace("klines cache hit: {}", key)
             return self.cache[key]
-        logger.trace("klines cache miss: {}", key)
+        # logger.trace("klines cache miss: {}", key)
         now: pendulum.DateTime = pendulum.now(pendulum.UTC)
         raw: list[list[Any]] = self.client.kline_candlestick_data(
             symbol=symbol,

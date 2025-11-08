@@ -160,6 +160,9 @@ class StrategyRev:
         self.time_series.add_metric("total_value", clock.now, total_value)
 
         cherries.log_metric("Total Value (USDT)", total_value, step=clock.step)
+        cherries.log_metric(
+            "price", api.price("BTCUSDT", interval="1m"), step=clock.step
+        )
 
 
 def plot_time_series(tss: TimeSeriesData, output_dir: str = "./plots") -> None:
@@ -259,7 +262,7 @@ def main(cfg: Config) -> None:
         qoc.set_clock(qoc.ClockOnline(interval="5m"))
     else:
         qoc.set_clock(
-            qoc.ClockOffline(interval="5m", start="2025-10-01", end="2025-10-15")
+            qoc.ClockOffline(interval="5m", start="2024-01-01", end="2025-01-01")
         )
     api: qoc.Api = qoc.ApiBinanceSpot() if cfg.online else qoc.ApiOfflineSpot()
     strategy = StrategyRev()
@@ -281,7 +284,7 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    main(cfg=Config())
+    cherries.run(main)
 
 
 # BINANCE_BASE_URL='https://api.binance.us' python /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/rev/main.py

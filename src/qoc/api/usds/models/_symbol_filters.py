@@ -42,7 +42,7 @@ class MarketLotSize(BaseModel):
         context: decimal.Context | None = None,
     ) -> Decimal:
         quantity = Decimal(quantity)
-        steps: Decimal = (quantity - self.min_qty) / self.step_size
+        steps: Decimal = max(quantity - self.min_qty, Decimal(0)) / self.step_size
         steps = steps.quantize(1, rounding=rounding, context=context)
         return self.min_qty + steps * self.step_size
 
