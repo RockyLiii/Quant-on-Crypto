@@ -21,7 +21,7 @@ from .api import (
 from .balance import Balance
 from .database import Database, Library
 from .market import Market
-from .strategy import Strategy, StrategySingleSymbol
+from .strategy import PersistableMixin, Strategy, StrategySingleSymbol
 from .time_utils import (
     Clock,
     ClockOffline,
@@ -69,6 +69,7 @@ __all__ = [
     "IntervalUnit",
     "Library",
     "Market",
+    "PersistableMixin",
     "Strategy",
     "StrategySingleSymbol",
     "TimeUnit",

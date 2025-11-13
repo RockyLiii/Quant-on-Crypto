@@ -31,6 +31,7 @@ dependencies = [
   "binance-connector>=3,<4",
   "binance-sdk-derivatives-trading-usds-futures>=2,<3",
   "cachetools>=6,<7",
+  "cattrs>=25.3.0,<26.0.0",
   "environs>=14,<15",
   "hishel>=1,<2",
   "httpx[socks]>=0.28,<0.29",

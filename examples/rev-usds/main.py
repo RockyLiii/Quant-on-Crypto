@@ -4,7 +4,9 @@ from decimal import Decimal
 import attrs
 import pendulum
 import polars as pl
+from environs import env
 from liblaf import cherries
+from loguru import logger
 from pendulum import DateTime, Duration
 
 import qoc
@@ -21,8 +23,8 @@ class Order:
 
 
 @attrs.define
-class Strategy:
-    api: ApiUsds
+class Strategy(qoc.PersistableMixin):
+    api: ApiUsds = attrs.field(metadata={"persist": False})
 
     symbols: list[SymbolName] = attrs.field(factory=lambda: ["BTCUSDT"])
 
@@ -113,7 +115,7 @@ class Strategy:
 
 
 class Config(cherries.BaseConfig):
-    online: bool = False
+    online: bool = env.bool("ONLINE", False)
 
 
 def main(cfg: Config) -> None:
@@ -126,8 +128,13 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
+    strategy.load_state()
     for _ in qoc.loop():
-        strategy.step()
+        try:
+            strategy.step()
+        except Exception as err:  # noqa: BLE001
+            logger.exception(err)
+        strategy.dump_state()
         strategy.log_stats()
 
 
