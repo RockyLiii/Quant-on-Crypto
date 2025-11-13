@@ -120,7 +120,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    env.read_env(verbose=True)
+    env.read_env(verbose=True, override=True)
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("5m"))
