@@ -78,7 +78,7 @@ class ApiUsdsOnline(ApiUsds):
     # ------------------------------ Market Data ----------------------------- #
 
     _exchange_info_cache: cachetools.Cache = attrs.field(
-        init=False, factory=lambda: cachetools.TTLCache(maxsize=1, ttl=3600)
+        repr=False, init=False, factory=lambda: cachetools.TTLCache(maxsize=1, ttl=3600)
     )
 
     @override

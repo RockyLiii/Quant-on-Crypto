@@ -42,7 +42,7 @@ class FuturesKlinesCache:
 
     client: DerivativesTradingUsdsFuturesRestAPI
     cache: cachetools.Cache[CacheKey, pl.DataFrame] = attrs.field(
-        factory=lambda: cachetools.LRUCache(maxsize=128)
+        repr=False, init=False, factory=lambda: cachetools.LRUCache(maxsize=128)
     )
     limit: int = 1000
 
