@@ -5,12 +5,14 @@ import attrs
 import binance.spot
 import cachetools
 import polars as pl
+from binance_common.constants import SPOT_REST_API_PROD_URL, SPOT_REST_API_TESTNET_URL
 from environs import env
 from loguru import logger
 from typing_extensions import deprecated
 
 import qoc.time_utils as tu
-from qoc.api import utils
+from qoc import utils
+from qoc.api import utils as api_utils
 from qoc.api._abc import Api
 from qoc.api.typing import (
     Account,
@@ -48,13 +50,17 @@ class ApiBinanceSpot(Api):
         if api_secret is None:
             api_secret = env.str("BINANCE_API_SECRET", None)
         if base_url is None:
-            kwargs["base_url"] = env.str("BINANCE_BASE_URL", None)
+            kwargs["base_url"] = utils.get_base_url(
+                "BINANCE_USDS_BASE_URL",
+                prod=SPOT_REST_API_PROD_URL,
+                testnet=SPOT_REST_API_TESTNET_URL,
+            )
         client = binance.spot.Spot(api_key=api_key, api_secret=api_secret, **kwargs)
         self.__attrs_init__(client=client)  # pyright: ignore[reportAttributeAccessIssue]
 
     @property
     def time_unit(self) -> tu.TimeUnit:
-        return utils.get_time_unit(self.client)
+        return api_utils.get_time_unit(self.client)
 
     # region General
 

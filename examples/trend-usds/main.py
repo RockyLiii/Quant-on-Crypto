@@ -371,7 +371,7 @@ class Strategy(qoc.PersistableMixin):
 
 
 class Config(cherries.BaseConfig):
-    online: bool = False
+    online: bool = True
 
 
 def main(cfg: Config) -> None:
