@@ -29,16 +29,15 @@ dependencies = [
   "attrs>=25,<26",
   "binance-common>=3,<4",
   "binance-connector>=3,<4",
-  "binance-sdk-derivatives-trading-usds-futures>=2,<3",
+  "binance-sdk-derivatives-trading-usds-futures>=3,<4",
   "cachetools>=6,<7",
-  "cattrs>=25.3.0,<26.0.0",
   "environs>=14,<15",
   "hishel>=1,<2",
   "httpx[socks]>=0.28,<0.29",
   "jaxtyping>=0.3,<0.4",
   "lazy-loader>=0.4,<0.5",
-  "liblaf-cherries>=0.6,<0.7",
-  "liblaf-grapes>=6,<7",
+  "liblaf-cherries>=0.7,<0.8",
+  "liblaf-grapes>=8,<9",
   "loguru>=0.7,<0.8",
   "matplotlib>=3,<4",
   "numpy>=2,<3",
@@ -47,13 +46,14 @@ dependencies = [
   "polars[pyarrow]>=1,<2",
   "pooch>=1,<2",
   "pydantic-extra-types[pendulum]>=2,<3",
+  "python-telegram-bot>=22,<23",
   "pyyaml>=6,<7",
   "requests>=2,<3",
   "scikit-learn>=1,<2",
   "scipy>=1,<2",
   "seaborn>=0.13,<0.14",
   "torch>=2,<3",
-  "tqdm>=4,<5",
+  "tqdm>=4,<5"
 ]
 dynamic = ["version"]
 
@@ -67,8 +67,8 @@ dynamic = ["version"]
 "Source Code" = "https://github.com/liblaf/Quant-on-Crypto"
 
 [dependency-groups]
-build = ["check-wheel-contents>=0.6,<0.7", "hatch>=1,<2", "twine>=6,<7"]
 dev = ["icecream>=2,<3"]
+build = ["check-wheel-contents>=0.6,<0.7", "hatch>=1,<2", "twine>=6,<7"]
 docs = ["liblaf-mkdocs-preset>=0.2,<0.3", "mkdocs>=1,<2"]
 test = ["liblaf-pytest-preset>=0.1,<0.2", "pytest>=8,<9"]
 

@@ -284,7 +284,7 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    cherries.run(main)
+    cherries.main(main)
 
 
 # BINANCE_BASE_URL='https://api.binance.us' python /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/rev/main.py
