@@ -29,7 +29,7 @@ dependencies = [
   "attrs>=25,<26",
   "binance-common>=3,<4",
   "binance-connector>=3,<4",
-  "binance-sdk-derivatives-trading-usds-futures>=3,<4",
+  "binance-sdk-derivatives-trading-usds-futures>=4,<5",
   "cachetools>=6,<7",
   "environs>=14,<15",
   "hishel>=1,<2",
@@ -67,7 +67,11 @@ dynamic = ["version"]
 "Source Code" = "https://github.com/liblaf/Quant-on-Crypto"
 
 [dependency-groups]
-dev = ["icecream>=2,<3"]
+dev = [
+  "marimo[recommended]>=0.18,<0.19",
+  "scipy-stubs>=1,<2",
+  "toolz-stubs>=0.2,<0.3"
+]
 build = ["check-wheel-contents>=0.6,<0.7", "hatch>=1,<2", "twine>=6,<7"]
 docs = ["liblaf-mkdocs-preset>=0.2,<0.3", "mkdocs>=1,<2"]
 test = ["liblaf-pytest-preset>=0.1,<0.2", "pytest>=8,<9"]
@@ -98,15 +102,15 @@ source = "vcs"
 [tool.pyright]
 extends = ".config/linters/pyrightconfig.json"
 
-[tool.pytest.ini_options]
+[tool.pytest]
 addopts = [
   "--doctest-modules",
-  "--hypothesis-show-statistics",
+  "--hypothesis-explain",
   "--import-mode=importlib",
-  "--showlocals",
-  "--strict-config",
-  "--strict-markers"
+  "--showlocals"
 ]
+consider_namespace_packages = true
+strict = true
 testpaths = ["benches", "src", "tests"]
 
 [tool.ruff]

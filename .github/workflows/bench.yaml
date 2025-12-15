@@ -5,20 +5,13 @@ name: Bench
 
 on:
   push:
-    branches-ignore:
-      - copier-update
-      - mega-linter-fix/**
-      - pre-commit-ci-update-config
-      - release-please--branches**
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
 env:
   FORCE_COLOR: 1
-
-concurrency:
-  group: ${{ github.workflow }} @ ${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   metadata:
@@ -29,7 +22,7 @@ jobs:
       python-versions: ${{ steps.inspect.outputs.supported_python_classifiers_json_array }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - id: inspect
         name: Build and Inspect a Python Package
         uses: hynek/build-and-inspect-python-package@v2
@@ -39,12 +32,18 @@ jobs:
         name: Collect
         run: |-
           if pytest -m 'benchmark' --collect-only; then
-            echo 'has-benches=true' >> "$GITHUB_OUTPUT"
+            echo 'has-tests=true' >> "$GITHUB_OUTPUT"
           else
-            echo 'has-benches=false' >> "$GITHUB_OUTPUT"
+            code="$?"
+            if (("$code" == 5)); then
+              echo 'has-tests=false' >> "$GITHUB_OUTPUT"
+            else
+              exit "$code"
+            fi
           fi
 
   # CodSpeedHQ does not support the same benchmark multiple times
+  # so we don't run on multiple python versions here.
   bench:
     name: Bench
     needs:
@@ -53,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup Python
         uses: liblaf/actions/setup-python@v1
       - name: Install Mise
