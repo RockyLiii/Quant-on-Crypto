@@ -372,10 +372,10 @@ class Strategy(qoc.PersistableMixin):
 
 class Config(cherries.BaseConfig):
     online: bool = True
-    group_key: str = "Trend USDS 2025-12-18"
 
 
 def main(cfg: Config) -> None:
+    cherries.log_param("group_key", "Trend USDS 2025-12-18")
     qoc.logging.init()
     api: ApiUsds
     if cfg.online:

@@ -36,13 +36,13 @@ class Strategy(qoc.PersistableMixin):
     future_end: Duration = attrs.field(factory=lambda: pendulum.duration(hours=30))
     """持有期"""
 
-    bullet_size: float = 100
+    bullet_size: float = 200
     """单次下单资金 (USDT)"""
 
     past_threshold: float = -0.02
     """买入阈值 (跌幅)"""
 
-    max_holdings: int = 5
+    max_holdings: int = 1
     """单标最大持仓 (单)"""
 
     # --------------------------------- State -------------------------------- #
@@ -120,6 +120,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
+    cherries.log_param("group_key", "Rev USDS 2025-12-18")
     env.read_env(verbose=True, override=True)
     api: ApiUsds
     if cfg.online:
