@@ -37,7 +37,7 @@ class Strategy(qoc.PersistableMixin):
     past_window: Duration = attrs.field(factory=lambda: pendulum.duration(days=4))
     """过去窗口"""
 
-    bullet_size: float = 25
+    bullet_size: float = 50
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
@@ -166,7 +166,7 @@ class Strategy(qoc.PersistableMixin):
         now: DateTime = qoc.now()
         for symbol in self.symbols:
             orders = self.orders[symbol]
-            klines: pl.DataFrame = self.api.klines(symbol, "1m", end_time=now, limit=1)
+            klines: pl.DataFrame = self.api.klines(symbol, "1m", end_time=now, limit=2)
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
             self.update_indicators(symbol, price, volume)
@@ -372,6 +372,7 @@ class Strategy(qoc.PersistableMixin):
 
 class Config(cherries.BaseConfig):
     online: bool = True
+    group_key: str = "Trend USDS 2025-12-18"
 
 
 def main(cfg: Config) -> None:
