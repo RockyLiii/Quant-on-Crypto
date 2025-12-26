@@ -55,12 +55,13 @@ from qoc.typing import DecimalLike, SymbolName
 class ApiUsdsOnline(ApiUsds):
     wrapped: DerivativesTradingUsdsFutures
 
-    def __init__(self) -> None:
+    def __init__(self, *, base_path: str | None = None) -> None:
         wrapped = DerivativesTradingUsdsFutures(
             config_rest_api=ConfigurationRestAPI(
                 api_key=env.str("BINANCE_USDS_API_KEY", ""),
                 api_secret=env.str("BINANCE_USDS_API_SECRET", None),
-                base_path=utils.get_base_url(
+                base_path=base_path
+                or utils.get_base_url(
                     "BINANCE_USDS_BASE_URL",
                     prod=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL,
                     testnet=DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL,
