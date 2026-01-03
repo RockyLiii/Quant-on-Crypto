@@ -37,7 +37,7 @@ class Strategy(qoc.PersistableMixin):
     past_window: Duration = attrs.field(factory=lambda: pendulum.duration(days=4))
     """过去窗口"""
 
-    bullet_size: float = 50
+    bullet_size: float = 90
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
@@ -375,14 +375,16 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "Trend USDS 2025-12-18")
-    qoc.logging.init()
+    cherries.log_parameter("group_key", "Trend USDS 2026-01-06 ETH")
+    # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("1m"))
         api = ApiUsdsOnline()
     else:
-        qoc.set_clock(qoc.ClockOffline("1m", start="2024-01-01", end="2025-11-20"))
+        # qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-01", end="2026-01-03"))
+
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
@@ -390,12 +392,15 @@ def main(cfg: Config) -> None:
     for _ in qoc.loop():
         try:
             strategy.step()
-            strategy.dump_state()
+            if cfg.online:
+                strategy.dump_state()
             strategy.log_stats()
         except Exception:
             logger.exception("")
 
 
 if __name__ == "__main__":
-    cherries.main(main)
-    # main(Config())
+    # cherries.main(main)
+    main(Config())
+
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main.py
