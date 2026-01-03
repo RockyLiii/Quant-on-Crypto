@@ -375,7 +375,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_parameter("group_key", "Trend USDS 2026-01-06 ETH")
+    cherries.log_param("group_key", "Trend USDS 2026-01-06 ETH")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
@@ -400,7 +400,7 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    # cherries.main(main)
-    main(Config())
+    cherries.main(main)
+    # main(Config())
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main.py
