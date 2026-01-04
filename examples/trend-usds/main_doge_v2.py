@@ -4,8 +4,10 @@ from collections import deque
 from decimal import Decimal
 
 import attrs
+import numpy as np
 import pendulum
 import polars as pl
+from environs import env
 from liblaf import cherries
 from pendulum import DateTime, Duration
 
@@ -30,18 +32,21 @@ class Order:
 class Strategy(qoc.PersistableMixin):
     api: ApiUsds
 
-    symbols: list[SymbolName] = attrs.field(factory=lambda: ["ETHUSDT"])
+    symbols: list[SymbolName] = attrs.field(factory=lambda: ["DOGEUSDT"])
 
     # -------------------------------- Config -------------------------------- #
 
-    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(days=4))
+    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=15))
     """过去窗口"""
 
-    bullet_size: float = 90
+    bullet_size: float = 50
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
     """单标最大持仓 (单)"""
+
+    window_ma = 24 * 60
+    window_fft = 5 * 24 * 60
 
     # --------------------------------- State -------------------------------- #
     orders: collections.defaultdict[str, deque[Order]] = attrs.field(
@@ -57,9 +62,16 @@ class Strategy(qoc.PersistableMixin):
     price_history: dict[str, list[float]] = attrs.field(
         factory=lambda: collections.defaultdict(list)
     )
+
     time_steps: list[int] = attrs.field(factory=list)
 
     volumes: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    prices_ma: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    prices_fft: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Historical prices for each symbol"""
@@ -89,19 +101,66 @@ class Strategy(qoc.PersistableMixin):
     )
     """Third derivative of VWAP for each symbol"""
 
-    past_window_length: int = attrs.field(default=4 * 24 * 60)
+    past_window_length: int = attrs.field(default=15 * 60)
 
     # Track last logged date for daily logging
     last_logged_date: str = attrs.field(default="")
     """Last logged date for daily progress tracking"""
 
+    period: collections.defaultdict[str, float] = attrs.field(
+        factory=lambda: collections.defaultdict(float)
+    )
+
+    count: collections.defaultdict[str, int] = attrs.field(
+        factory=lambda: collections.defaultdict(int)
+    )
+
     def update_indicators(self, symbol: str, price: float, volume: float):
         """Update price and volume based indicators"""
+        self.count[symbol] += 1
         if volume == 0:
             volume = 1e-6  # Prevent division by zero
         self.volumes[symbol].append(volume)
         if len(self.volumes[symbol]) > self.past_window_length:
             self.volumes[symbol].popleft()
+
+        self.prices_ma[symbol].append(price)
+        if len(self.prices_ma[symbol]) > self.window_ma:
+            self.prices_ma[symbol].popleft()
+
+        self.prices_fft[symbol].append(
+            (price - np.mean(self.prices_ma[symbol]))
+            if len(self.prices_ma[symbol]) >= self.window_ma
+            else 0.0
+        )
+        if len(self.prices_fft[symbol]) > self.window_fft:
+            self.prices_fft[symbol].popleft()
+
+        if (
+            self.count[symbol] % 1 == 0
+            and len(self.prices_fft[symbol]) == self.window_fft
+        ):
+            fft_coeff = np.fft.fft(self.prices_fft[symbol])
+            freq = np.fft.fftfreq(
+                len(self.prices_fft[symbol])
+            )  # Pass length as integer
+            power = np.abs(fft_coeff)
+
+            idx_max = np.argsort(power)[-1]  # 最大能量的频率下标
+            idx_max_2 = np.argsort(power)[-2]  # 最大能量的频率下标
+            idx_max_3 = np.argsort(power)[-3]  # 最大能量的频率下标
+            idx_max_4 = np.argsort(power)[-4]  # 最大能量的频率下标
+            idx_max_5 = np.argsort(power)[-5]  # 最大能量的频率下标
+            per = []
+            for idx in [idx_max, idx_max_2, idx_max_3, idx_max_4, idx_max_5]:
+                freq_val = abs(freq[idx])
+                if freq_val != 0:
+                    period = 1 / freq_val
+                    per.append(period)
+
+            per = np.array(per)
+
+            self.period[symbol] = per[0]
 
         self.prices_times_volumes[symbol].append(price * volume)
         if len(self.prices_times_volumes[symbol]) > self.past_window_length:
@@ -173,30 +232,11 @@ class Strategy(qoc.PersistableMixin):
 
             if (
                 self.vwaps_deri_1[symbol][-1] > 0
-                and self.vwaps_deri_2[symbol][-1] > 0
+                # and self.vwaps_deri_2[symbol][-1] > 0
                 # and self.vwaps_deri_3[symbol][-1] > 0
                 and len(orders) < self.max_holdings
-            ):
-                quantity: float = self.bullet_size / price
-
-                response: OrderResponse = self.api.order_market(
-                    symbol, OrderSide.SELL, quantity=quantity
-                )
-                logger.warning("Placed SELL order: %s", response)
-                self.orders[symbol].append(
-                    Order(
-                        quantity=abs(response.orig_qty),
-                        symbol=symbol,
-                        time=response.update_time,
-                        direction="SELL",
-                    )
-                )
-
-            if (
-                self.vwaps_deri_1[symbol][-1] < 0
-                and self.vwaps_deri_2[symbol][-1] < 0
-                # and self.vwaps_deri_3[symbol][-1] < 0
-                and len(orders) < self.max_holdings
+                and self.period[symbol] < 4000
+                # and self.period[symbol]>3000
             ):
                 quantity: float = self.bullet_size / price
 
@@ -213,32 +253,36 @@ class Strategy(qoc.PersistableMixin):
                     )
                 )
 
-            while (
-                orders
-                and (
-                    not (
-                        self.vwaps_deri_1[symbol][-1] > 0
-                        and self.vwaps_deri_2[symbol][-1] > 0
-                        # and self.vwaps_deri_3[symbol][-1] > 0
+            if (
+                self.vwaps_deri_1[symbol][-1] < 0
+                # and self.vwaps_deri_2[symbol][-1] < 0
+                # and self.vwaps_deri_3[symbol][-1] < 0
+                and len(orders) < self.max_holdings
+                and self.period[symbol] < 4000
+                # and self.period[symbol]>3000
+            ):
+                quantity: float = self.bullet_size / price
+
+                response: OrderResponse = self.api.order_market(
+                    symbol, OrderSide.SELL, quantity=quantity
+                )
+                logger.warning("Placed SELL order: %s", response)
+                self.orders[symbol].append(
+                    Order(
+                        quantity=abs(response.orig_qty),
+                        symbol=symbol,
+                        time=response.update_time,
+                        direction="SELL",
                     )
                 )
-                and orders[-1].direction == "SELL"
-            ):
-                order: Order = orders[0]
-                response = self.api.order_market(
-                    order.symbol, OrderSide.BUY, quantity=abs(order.quantity)
-                )
-                orders.popleft()
-                logger.warning("Closed SELL order: %s", response)
-            # self.orders[symbol] = orders
 
             while (
                 orders
                 and (
                     not (
-                        self.vwaps_deri_1[symbol][-1] < 0
-                        and self.vwaps_deri_2[symbol][-1] < 0
-                        # and self.vwaps_deri_3[symbol][-1] < 0
+                        self.vwaps_deri_1[symbol][-1] > 0
+                        # and self.vwaps_deri_2[symbol][-1] > 0
+                        # and self.vwaps_deri_3[symbol][-1] > 0
                     )
                 )
                 and orders[-1].direction == "BUY"
@@ -249,6 +293,25 @@ class Strategy(qoc.PersistableMixin):
                 )
                 orders.popleft()
                 logger.warning("Closed BUY order: %s", response)
+            # self.orders[symbol] = orders
+
+            while (
+                orders
+                and (
+                    not (
+                        self.vwaps_deri_1[symbol][-1] < 0
+                        # and self.vwaps_deri_2[symbol][-1] < 0
+                        # and self.vwaps_deri_3[symbol][-1] < 0
+                    )
+                )
+                and orders[-1].direction == "SELL"
+            ):
+                order: Order = orders[0]
+                response = self.api.order_market(
+                    order.symbol, OrderSide.BUY, quantity=abs(order.quantity)
+                )
+                orders.popleft()
+                logger.warning("Closed SELL order: %s", response)
             self.orders[symbol] = orders
 
         self.t += 1
@@ -266,7 +329,7 @@ class Strategy(qoc.PersistableMixin):
             asset_metrics[name] = {"margin_balance": asset.margin_balance}
             # Store in history
             self.asset_history[name].append(asset.margin_balance)
-            self.price_history[name].append(self.api.ticker_price("ETHUSDT").price)
+            self.price_history[name].append(self.api.ticker_price("DOGEUSDT").price)
         self.time_steps.append(self.t)
 
         for symbol, position in account.positions.items():
@@ -347,7 +410,7 @@ class Strategy(qoc.PersistableMixin):
             ax3.axhline(y=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
 
             plt.tight_layout()
-            plt.savefig("examples/trend-usds/asset_metrics.png")
+            plt.savefig("examples/trend-usds/asset_metrics_1.png")
             plt.close()  # 关闭图表释放内存
         stats: dict[str, dict[str, float]] = {}
         for symbol in self.symbols:
@@ -360,8 +423,8 @@ class Strategy(qoc.PersistableMixin):
         cherries.log_metrics(
             {
                 "assets": asset_metrics,
-                "open_orders": len(self.orders["ETHUSDT"]),
-                "price": self.api.ticker_price("ETHUSDT").price,
+                "open_orders": len(self.orders["DOGEUSDT"]),
+                "price": self.api.ticker_price("DOGEUSDT").price,
                 "time": now.timestamp(),
                 "stats": stats,
                 # "positions": position_metrics,
@@ -371,20 +434,18 @@ class Strategy(qoc.PersistableMixin):
 
 
 class Config(cherries.BaseConfig):
-    online: bool = True
+    online: bool = env.bool("ONLINE", False)
 
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "Trend USDS 2026-01-06 ETH")
+    cherries.log_param("group_key", "Trend USDS 2026-01-03 DOGE")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("1m"))
         api = ApiUsdsOnline()
     else:
-        # qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
         qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-01", end="2026-01-03"))
-
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
@@ -403,4 +464,5 @@ if __name__ == "__main__":
     cherries.main(main)
     # main(Config())
 
-# BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main.py
+
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main_doge.py
