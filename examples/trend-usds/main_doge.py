@@ -17,6 +17,8 @@ from qoc.api.usds import ApiUsds, ApiUsdsOffline, ApiUsdsOnline
 from qoc.api.usds.models import Account, MarginType, OrderResponse, OrderSide
 from qoc.typing import SymbolName
 
+import pandas as pd  # For data handling in plotting
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,10 +38,11 @@ class Strategy(qoc.PersistableMixin):
 
     # -------------------------------- Config -------------------------------- #
 
-    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=15))
+    past_window_1: Duration = attrs.field(factory=lambda: pendulum.duration(hours=15))
+    past_window_2: Duration = attrs.field(factory=lambda: pendulum.duration(hours=7.5))
     """过去窗口"""
 
-    bullet_size: float = 50
+    bullet_size: float = 60
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
@@ -66,43 +69,80 @@ class Strategy(qoc.PersistableMixin):
 
     time_steps: list[int] = attrs.field(factory=list)
 
-    volumes: collections.defaultdict[str, deque[float]] = attrs.field(
-        factory=lambda: collections.defaultdict(deque)
-    )
+
     prices_ma: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     prices_fft: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
-    """Historical prices for each symbol"""
 
-    prices_times_volumes: collections.defaultdict[str, deque[float]] = attrs.field(
+
+    # 周期1
+    volumes_1: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+
+    prices_times_volumes_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Historical price*volume products for each symbol"""
 
-    vwaps: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Historical VWAP values for each symbol"""
 
-    vwaps_deri_1: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_1_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """First derivative of VWAP for each symbol"""
 
-    vwaps_deri_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_2_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Second derivative of VWAP for each symbol"""
 
-    vwaps_deri_3: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_3_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Third derivative of VWAP for each symbol"""
 
-    past_window_length: int = attrs.field(default= 15 * 60)
+    past_window_length_1: int = attrs.field(default= 0)
+
+    # 周期2
+    volumes_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+
+    """Historical prices for each symbol"""
+
+    prices_times_volumes_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Historical price*volume products for each symbol"""
+
+    vwaps_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Historical VWAP values for each symbol"""
+
+    vwaps_deri_1_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """First derivative of VWAP for each symbol"""
+
+    vwaps_deri_2_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Second derivative of VWAP for each symbol"""
+
+    vwaps_deri_3_2: collections.defaultdict[str, deque[float]] = attrs.field(
+        factory=lambda: collections.defaultdict(deque)
+    )
+    """Third derivative of VWAP for each symbol"""
+
+    past_window_length_2: int = attrs.field(default= 0)
 
     # Track last logged date for daily logging
     last_logged_date: str = attrs.field(default="")
@@ -123,9 +163,13 @@ class Strategy(qoc.PersistableMixin):
         self.count[symbol] += 1
         if volume == 0:
             volume = 1e-6  # Prevent division by zero
-        self.volumes[symbol].append(volume)
-        if len(self.volumes[symbol]) > self.past_window_length:
-            self.volumes[symbol].popleft()
+        self.volumes_1[symbol].append(volume)
+        if len(self.volumes_1[symbol]) > self.past_window_length_1:
+            self.volumes_1[symbol].popleft()
+
+        self.volumes_2[symbol].append(volume)
+        if len(self.volumes_2[symbol]) > self.past_window_length_2:
+            self.volumes_2[symbol].popleft()
 
         self.prices_ma[symbol].append(price)
         if len(self.prices_ma[symbol]) > self.window_ma:
@@ -155,36 +199,66 @@ class Strategy(qoc.PersistableMixin):
 
             per = np.array(per)
 
-            self.period[symbol] = per[0]
+            if len(self.orders[symbol]) < self.max_holdings:
+                self.period[symbol] = per[0]
             
 
 
 
-        self.prices_times_volumes[symbol].append(price * volume)
-        if len(self.prices_times_volumes[symbol]) > self.past_window_length:
-            self.prices_times_volumes[symbol].popleft()
+        self.prices_times_volumes_1[symbol].append(price * volume)
+        if len(self.prices_times_volumes_1[symbol]) > self.past_window_length_1:
+            self.prices_times_volumes_1[symbol].popleft()
 
-        self.vwaps[symbol].append(
-            sum(self.prices_times_volumes[symbol]) / sum(self.volumes[symbol])
+        self.vwaps_1[symbol].append(
+            sum(self.prices_times_volumes_1[symbol]) / sum(self.volumes_1[symbol])
         )
-        if len(self.vwaps[symbol]) > self.past_window_length:
-            self.vwaps[symbol].popleft()
+        if len(self.vwaps_1[symbol]) > self.past_window_length_1:
+            self.vwaps_1[symbol].popleft()
 
-        self.vwaps_deri_1[symbol].append(self.vwaps[symbol][-1] - self.vwaps[symbol][0])
-        if len(self.vwaps_deri_1[symbol]) > self.past_window_length:
-            self.vwaps_deri_1[symbol].popleft()
+        self.vwaps_deri_1_1[symbol].append(self.vwaps_1[symbol][-1] - self.vwaps_1[symbol][0])
+        if len(self.vwaps_deri_1_1[symbol]) > self.past_window_length_1:
+            self.vwaps_deri_1_1[symbol].popleft()
 
-        self.vwaps_deri_2[symbol].append(
-            self.vwaps_deri_1[symbol][-1] - self.vwaps_deri_1[symbol][0]
+        self.vwaps_deri_2_1[symbol].append(
+            self.vwaps_deri_1_1[symbol][-1] - self.vwaps_deri_1_1[symbol][0]
         )
-        if len(self.vwaps_deri_2[symbol]) > self.past_window_length:
-            self.vwaps_deri_2[symbol].popleft()
+        if len(self.vwaps_deri_2_1[symbol]) > self.past_window_length_1:
+            self.vwaps_deri_2_1[symbol].popleft()
 
-        self.vwaps_deri_3[symbol].append(
-            self.vwaps_deri_2[symbol][-1] - self.vwaps_deri_2[symbol][0]
+        self.vwaps_deri_3_1[symbol].append(
+            self.vwaps_deri_2_1[symbol][-1] - self.vwaps_deri_2_1[symbol][0]
         )
-        if len(self.vwaps_deri_3[symbol]) > self.past_window_length:
-            self.vwaps_deri_3[symbol].popleft()
+        if len(self.vwaps_deri_3_1[symbol]) > self.past_window_length_1:
+            self.vwaps_deri_3_1[symbol].popleft()
+
+
+
+
+        self.prices_times_volumes_2[symbol].append(price * volume)
+        if len(self.prices_times_volumes_2[symbol]) > self.past_window_length_2:
+            self.prices_times_volumes_2[symbol].popleft()
+
+        self.vwaps_2[symbol].append(
+            sum(self.prices_times_volumes_2[symbol]) / sum(self.volumes_2[symbol])
+        )
+        if len(self.vwaps_2[symbol]) > self.past_window_length_2:
+            self.vwaps_2[symbol].popleft()
+
+        self.vwaps_deri_1_2[symbol].append(self.vwaps_2[symbol][-1] - self.vwaps_2[symbol][0])
+        if len(self.vwaps_deri_1_2[symbol]) > self.past_window_length_2:
+            self.vwaps_deri_1_2[symbol].popleft()
+
+        self.vwaps_deri_2_2[symbol].append(
+            self.vwaps_deri_1_2[symbol][-1] - self.vwaps_deri_1_2[symbol][0]
+        )
+        if len(self.vwaps_deri_2_2[symbol]) > self.past_window_length_2:
+            self.vwaps_deri_2_2[symbol].popleft()
+
+        self.vwaps_deri_3_2[symbol].append(
+            self.vwaps_deri_2_2[symbol][-1] - self.vwaps_deri_2_2[symbol][0]
+        )
+        if len(self.vwaps_deri_3_2[symbol]) > self.past_window_length_2:
+            self.vwaps_deri_3_2[symbol].popleft()
 
     def __attrs_post_init__(self) -> None:
         """在所有字段初始化后执行的自定义初始化逻辑"""
@@ -193,12 +267,13 @@ class Strategy(qoc.PersistableMixin):
         # 可以在这里设置初始值或执行其他初始化逻辑
         for symbol in self.symbols:
             print(f"Initialized state for symbol: {symbol}")
-            self.past_window_length = int(self.past_window.in_minutes())
+            self.past_window_length_1 = int(self.past_window_1.in_minutes())
+            self.past_window_length_2 = int(self.past_window_2.in_minutes())
 
             now: DateTime = qoc.now()
 
             klines: pl.DataFrame = self.api.klines(
-                symbol, "1m", end_time=now, limit=self.past_window_length * 4
+                symbol, "1m", end_time=now, limit=self.past_window_length_1 * 4
             )
 
             prices = klines["close"].to_list()
@@ -227,14 +302,14 @@ class Strategy(qoc.PersistableMixin):
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
             self.update_indicators(symbol, price, volume)
-
+            # 周期1
             if (
-                self.vwaps_deri_1[symbol][-1] > 0
-                # and self.vwaps_deri_2[symbol][-1] > 0
-                # and self.vwaps_deri_3[symbol][-1] > 0
+                self.vwaps_deri_1_1[symbol][-1] > 0
+                # and self.vwaps_deri_2_1[symbol][-1] > 0
+                # and self.vwaps_deri_3_1[symbol][-1] > 0
                 and len(orders) < self.max_holdings
                 and self.period[symbol] < 4000
-                # and self.period[symbol]>3000
+                and self.period[symbol] > 3000
             ):
                 quantity: float = self.bullet_size / price
 
@@ -252,14 +327,12 @@ class Strategy(qoc.PersistableMixin):
                 )
 
             if (
-                self.vwaps_deri_1[symbol][-1] < 0
-                # and self.vwaps_deri_2[symbol][-1] < 0
-                # and self.vwaps_deri_3[symbol][-1] < 0
+                self.vwaps_deri_1_1[symbol][-1] < 0
+                # and self.vwaps_deri_2_1[symbol][-1] < 0
+                # and self.vwaps_deri_3_1[symbol][-1] < 0
                 and len(orders) < self.max_holdings
                 and self.period[symbol] < 4000
-                # and self.period[symbol]>3000
-
-
+                and self.period[symbol] > 3000
             ):
                 quantity: float = self.bullet_size / price
 
@@ -280,11 +353,14 @@ class Strategy(qoc.PersistableMixin):
                 orders
                 and (
                     not (
-                        self.vwaps_deri_1[symbol][-1] > 0
-                        # and self.vwaps_deri_2[symbol][-1] > 0
-                        # and self.vwaps_deri_3[symbol][-1] > 0
+                        self.vwaps_deri_1_1[symbol][-1] > 0
+                        # and self.vwaps_deri_2_1[symbol][-1] > 0
+                        # and self.vwaps_deri_3_1[symbol][-1] > 0
                     )
+
                 )
+                and self.period[symbol] < 4000
+                and self.period[symbol] > 3000
                 and orders[-1].direction == "BUY"
             ):
                 order: Order = orders[0]
@@ -299,11 +375,103 @@ class Strategy(qoc.PersistableMixin):
                 orders
                 and (
                     not (
-                        self.vwaps_deri_1[symbol][-1] < 0
-                        # and self.vwaps_deri_2[symbol][-1] < 0
-                        # and self.vwaps_deri_3[symbol][-1] < 0
+                        self.vwaps_deri_1_1[symbol][-1] < 0
+                        # and self.vwaps_deri_2_1[symbol][-1] < 0
+                        # and self.vwaps_deri_3_1[symbol][-1] < 0
                     )
                 )
+                and self.period[symbol] < 4000
+                and self.period[symbol] > 3000
+                and orders[-1].direction == "SELL"
+            ):
+                order: Order = orders[0]
+                response = self.api.order_market(
+                    order.symbol, OrderSide.BUY, quantity=abs(order.quantity)
+                )
+                orders.popleft()
+                logger.warning("Closed SELL order: %s", response)
+            self.orders[symbol] = orders
+
+
+           # 周期2
+            if (
+                self.vwaps_deri_1_2[symbol][-1] > 0
+                # and self.vwaps_deri_2_2[symbol][-1] > 0
+                # and self.vwaps_deri_3_2[symbol][-1] > 0
+                and len(orders) < self.max_holdings
+                and self.period[symbol] < 3000
+                and self.period[symbol] > 1500
+            ):
+                quantity: float = self.bullet_size / price
+
+                response: OrderResponse = self.api.order_market(
+                    symbol, OrderSide.BUY, quantity=quantity
+                )
+                logger.warning("Placed BUY order: %s", response)
+                self.orders[symbol].append(
+                    Order(
+                        quantity=abs(response.orig_qty),
+                        symbol=symbol,
+                        time=response.update_time,
+                        direction="BUY",
+                    )
+                )
+
+            if (
+                self.vwaps_deri_1_2[symbol][-1] < 0
+                # and self.vwaps_deri_2_2[symbol][-1] < 0
+                # and self.vwaps_deri_3_2[symbol][-1] < 0
+                and len(orders) < self.max_holdings
+                and self.period[symbol] < 3000
+                and self.period[symbol] > 1500
+            ):
+                quantity: float = self.bullet_size / price
+
+                response: OrderResponse = self.api.order_market(
+                    symbol, OrderSide.SELL, quantity=quantity
+                )
+                logger.warning("Placed SELL order: %s", response)
+                self.orders[symbol].append(
+                    Order(
+                        quantity=abs(response.orig_qty),
+                        symbol=symbol,
+                        time=response.update_time,
+                        direction="SELL",
+                    )
+                )
+
+            while (
+                orders
+                and (
+                    not (
+                        self.vwaps_deri_1_2[symbol][-1] > 0
+                        # and self.vwaps_deri_2_2[symbol][-1] > 0
+                        # and self.vwaps_deri_3_2[symbol][-1] > 0
+                    )
+                )
+                and self.period[symbol] < 3000
+                and self.period[symbol] > 1500
+                and orders[-1].direction == "BUY"
+            ):
+                order: Order = orders[0]
+                response = self.api.order_market(
+                    order.symbol, OrderSide.SELL, quantity=abs(order.quantity)
+                )
+                orders.popleft()
+                logger.warning("Closed BUY order: %s", response)
+            # self.orders[symbol] = orders
+
+            while (
+                orders
+                and (
+                    not (
+                        self.vwaps_deri_1_2[symbol][-1] < 0
+                        # and self.vwaps_deri_2_2[symbol][-1] < 0
+                        # and self.vwaps_deri_3_2[symbol][-1] < 0
+                    )
+                )
+                and self.period[symbol] < 3000
+                and self.period[symbol] > 1500
                 and orders[-1].direction == "SELL"
             ):
                 order: Order = orders[0]
@@ -327,6 +495,7 @@ class Strategy(qoc.PersistableMixin):
         # Record current metrics
         for name, asset in account.assets.items():
             asset_metrics[name] = {"margin_balance": asset.margin_balance}
+            
             # Store in history
             self.asset_history[name].append(asset.margin_balance)
             self.price_history[name].append(self.api.ticker_price("DOGEUSDT").price)
@@ -351,6 +520,11 @@ class Strategy(qoc.PersistableMixin):
                 ax1.plot(
                     self.time_steps, balance_history, "-", label=f"{asset_name} Balance"
                 )
+                balance_history_pd = pd.DataFrame({
+                    'Time Steps': self.time_steps,
+                    'Balance': balance_history
+                })
+                balance_history_pd.to_csv('examples/rev-usds/asset_balance_doge.csv')
             ax1.set_xlabel("Time Steps")
             ax1.set_ylabel("Balance (USDT)", color="tab:blue")
             ax1.tick_params(axis="y", labelcolor="tab:blue")
@@ -380,24 +554,24 @@ class Strategy(qoc.PersistableMixin):
             for symbol in self.symbols:
                 # Calculate the correct time steps for VWAP data
                 # VWAP data starts from negative indices (historical data)
-                vwap_length = len(self.vwaps[symbol])
+                vwap_length = len(self.vwaps_1[symbol])
                 current_step = self.time_steps[-1]
                 vwap_steps = list(
                     range(current_step - vwap_length + 1, current_step + 1)
                 )
 
                 ax3.plot(
-                    vwap_steps, list(self.vwaps[symbol]), "-", label=f"{symbol} VWAP"
+                    vwap_steps, list(self.vwaps_1[symbol]), "-", label=f"{symbol} VWAP"
                 )
                 ax3.plot(
                     vwap_steps,
-                    list(self.vwaps_deri_1[symbol]),
+                    list(self.vwaps_deri_1_1[symbol]),
                     "--",
                     label=f"{symbol} VWAP Deri 1",
                 )
                 ax3.plot(
                     vwap_steps,
-                    list(self.vwaps_deri_2[symbol]),
+                    list(self.vwaps_deri_2_1[symbol]),
                     "-.",
                     label=f"{symbol} VWAP Deri 2",
                 )
@@ -415,10 +589,10 @@ class Strategy(qoc.PersistableMixin):
         stats: dict[str, dict[str, float]] = {}
         for symbol in self.symbols:
             stats[symbol] = {
-                "vwap": self.vwaps[symbol][-1],
-                "vwap_deri_1": self.vwaps_deri_1[symbol][-1],
-                "vwap_deri_2": self.vwaps_deri_2[symbol][-1],
-                "vwap_deri_3": self.vwaps_deri_3[symbol][-1],
+                "vwap": self.vwaps_1[symbol][-1],
+                "vwap_deri_1": self.vwaps_deri_1_1[symbol][-1],
+                "vwap_deri_2": self.vwaps_deri_2_1[symbol][-1],
+                "vwap_deri_3": self.vwaps_deri_3_1[symbol][-1],
             }
         cherries.log_metrics(
             {
@@ -438,7 +612,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_parameter("group_key", "Trend USDS 2026-01-03 DOGE")
+    cherries.log_parameter("group_key", "Trend USDS 2026-01-04 DOGE")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
