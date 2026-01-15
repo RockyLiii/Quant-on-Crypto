@@ -50,7 +50,6 @@ class Strategy(qoc.PersistableMixin):
             "AVAXUSDT",
             "LINKUSDT",
             "TRXUSDT",
-
             "DOTUSDT",
             "MATICUSDT",
             "LTCUSDT",
@@ -60,7 +59,6 @@ class Strategy(qoc.PersistableMixin):
             "ICPUSDT",
             "APTUSDT",
             "FILUSDT",
-
             # "NEARUSDT",
             # "HBARUSDT",
             # "INJUSDT",
@@ -98,20 +96,16 @@ class Strategy(qoc.PersistableMixin):
     )
     # -------------------------------- Config -------------------------------- #
 
-
     forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=6))
 
     back_window_in_mins: int = 12
-    
 
     back_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=12))
-
 
     bullet_size: float = 5000
 
     stop_loss: float = 99999  # 5%
     take_profit: float = 99999  # 10%
-
 
     # --------------------------------- State -------------------------------- #
     orders: collections.defaultdict[str, deque[Order]] = attrs.field(
@@ -136,14 +130,12 @@ class Strategy(qoc.PersistableMixin):
     # coin_closes: dict[str, deque] = attrs.field(factory=dict)
     # coin_volumes: dict[str, deque] = attrs.field(factory=dict)
 
-
     # Statistical calculation deques
     xy_1: dict[str, deque] = attrs.field(factory=dict)
     xx_1: dict[str, deque] = attrs.field(factory=dict)
     yy_1: dict[str, deque] = attrs.field(factory=dict)
     x_1: dict[str, deque] = attrs.field(factory=dict)
     y_1: dict[str, deque] = attrs.field(factory=dict)
-
 
     # Sum variables for efficient rolling calculations
     xy_1_sum: dict[str, float] = attrs.field(factory=dict)
@@ -152,12 +144,18 @@ class Strategy(qoc.PersistableMixin):
     x_1_sum: dict[str, float] = attrs.field(factory=dict)
     y_1_sum: dict[str, float] = attrs.field(factory=dict)
 
-
     # Statistics tracking
     revenues: list[float] = attrs.field(factory=list)
     # coin_revenues: dict[str, list[float]] = attrs.field(factory=dict)
 
-    def update_indicators(self, symbol: str, price: float, volume: float, btc_price: float, btc_volume: float):
+    def update_indicators(
+        self,
+        symbol: str,
+        price: float,
+        volume: float,
+        btc_price: float,
+        btc_volume: float,
+    ):
         """Update price and volume based indicators"""
 
         if len(self.xy_1[symbol]) >= self.back_window_in_mins:
@@ -180,7 +178,6 @@ class Strategy(qoc.PersistableMixin):
         x_1_val = btc_price
         y_1_val = price
 
-
         self.xy_1[symbol].append(xy_1_val)
         self.xx_1[symbol].append(xx_1_val)
         self.yy_1[symbol].append(yy_1_val)
@@ -193,8 +190,6 @@ class Strategy(qoc.PersistableMixin):
         self.yy_1_sum[symbol] += yy_1_val
         self.x_1_sum[symbol] += x_1_val
         self.y_1_sum[symbol] += y_1_val
-
-
 
     def __attrs_post_init__(self) -> None:
         """Initialize symbol-based dictionaries after object creation"""
@@ -213,11 +208,11 @@ class Strategy(qoc.PersistableMixin):
             self.yy_1_sum[symbol] = 0.0
             self.x_1_sum[symbol] = 0.0
             self.y_1_sum[symbol] = 0.0
-        
+
         now: DateTime = qoc.now()
 
         btc_klines: pl.DataFrame = self.api.klines(
-            "BTCUSDT", "1m", end_time=now, limit=2*self.back_window_in_mins
+            "BTCUSDT", "1m", end_time=now, limit=2 * self.back_window_in_mins
         )
 
         btc_prices = btc_klines["close"].to_list()
@@ -225,23 +220,27 @@ class Strategy(qoc.PersistableMixin):
 
         # Keep track of symbols that fail to load data
         symbols_to_remove = []
-        
+
         for symbol in self.symbols:
             try:
                 klines: pl.DataFrame = self.api.klines(
-                    symbol, "1m", end_time=now, limit=2*self.back_window_in_mins
+                    symbol, "1m", end_time=now, limit=2 * self.back_window_in_mins
                 )
 
                 prices = klines["close"].to_list()
                 volumes = klines["volume"].to_list()
 
                 for i in range(len(prices)):
-                    self.update_indicators(symbol, prices[i], volumes[i], btc_prices[i], btc_volumes[i])
-                    
+                    self.update_indicators(
+                        symbol, prices[i], volumes[i], btc_prices[i], btc_volumes[i]
+                    )
+
             except Exception as e:
-                logger.warning("Failed to load data for %s: %s. Removing from symbols.", symbol, e)
+                logger.warning(
+                    "Failed to load data for %s: %s. Removing from symbols.", symbol, e
+                )
                 symbols_to_remove.append(symbol)
-                
+
         # Remove failed symbols
         for symbol in symbols_to_remove:
             self.symbols.remove(symbol)
@@ -260,7 +259,9 @@ class Strategy(qoc.PersistableMixin):
 
         print(f"Strategy initialized with {len(self.symbols)} symbols: {self.symbols}")
         if symbols_to_remove:
-            print(f"Removed {len(symbols_to_remove)} symbols due to data loading failures: {symbols_to_remove}")
+            print(
+                f"Removed {len(symbols_to_remove)} symbols due to data loading failures: {symbols_to_remove}"
+            )
 
     def init(self) -> None:
         try:
@@ -289,48 +290,41 @@ class Strategy(qoc.PersistableMixin):
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
             self.update_indicators(symbol, price, volume, btc_price, btc_volume)
 
-
-
-
             # With intercept
             # beta = (self.back_window_in_mins * self.xy_1_sum[symbol] - self.x_1_sum[symbol]*self.y_1_sum[symbol]) / (self.back_window_in_mins * self.xx_1_sum[symbol] - self.x_1_sum[symbol]**2)
 
-            # alpha = (self.y_1_sum[symbol] - beta * self.x_1_sum[symbol]) / self.back_window_in_mins 
+            # alpha = (self.y_1_sum[symbol] - beta * self.x_1_sum[symbol]) / self.back_window_in_mins
 
             # residual = price - (beta * btc_price + alpha)
 
+            beta = self.xy_1_sum[symbol] / self.xx_1_sum[symbol]
 
-            beta = self.xy_1_sum[symbol]/self.xx_1_sum[symbol]
-            
             residual = price - (beta * btc_price)
 
-
-
             coef_records[symbol] = {
-                'Close': price,
-                'beta': beta,
+                "Close": price,
+                "beta": beta,
                 # 'alpha': alpha,
-                'residual': residual/beta if beta != 0 else 0,
+                "residual": residual / beta if beta != 0 else 0,
             }
-        
-        coef_df = pd.DataFrame.from_dict(coef_records, orient='index')  # index=coin
 
+        coef_df = pd.DataFrame.from_dict(coef_records, orient="index")  # index=coin
 
         # Select coins based on residual values
-        l_coin = coef_df.sort_values(by='residual', ascending=True).index[0]
-        s_coin = coef_df.sort_values(by='residual', ascending=False).index[0]
+        l_coin = coef_df.sort_values(by="residual", ascending=True).index[0]
+        s_coin = coef_df.sort_values(by="residual", ascending=False).index[0]
 
-        price_l_now = coef_records[l_coin]['Close']
-        price_s_now = coef_records[s_coin]['Close']
-        
-        beta_l = coef_records[l_coin]['beta']
-        beta_s = coef_records[s_coin]['beta']
+        price_l_now = coef_records[l_coin]["Close"]
+        price_s_now = coef_records[s_coin]["Close"]
+
+        beta_l = coef_records[l_coin]["beta"]
+        beta_s = coef_records[s_coin]["beta"]
 
         q_l = beta_s * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
         q_s = beta_l * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
 
-        if q_l>0 and q_s>0:
-            # long 
+        if q_l > 0 and q_s > 0:
+            # long
             response_l: OrderResponse = self.api.order_market(
                 l_coin, OrderSide.BUY, quantity=q_l
             )
@@ -339,7 +333,9 @@ class Strategy(qoc.PersistableMixin):
                 s_coin, OrderSide.SELL, quantity=q_s
             )
 
-            self.temp += price_l_now*(q_l-float(abs(response_l.orig_qty))) + price_s_now*(float(abs(response_s.orig_qty))-q_s)
+            self.temp += price_l_now * (
+                q_l - float(abs(response_l.orig_qty))
+            ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
 
             # logger.warning("Placed BUY order: %s", response)
             self.orders[l_coin].append(
@@ -348,7 +344,6 @@ class Strategy(qoc.PersistableMixin):
                     quantity_l=abs(response_l.orig_qty),
                     symbol_l=l_coin,
                     time_l=response_l.update_time,
-                    
                     price_s=price_s_now,
                     quantity_s=abs(response_s.orig_qty),
                     symbol_s=s_coin,
@@ -356,26 +351,40 @@ class Strategy(qoc.PersistableMixin):
                 )
             )
 
-
-
         for symbol in self.symbols:
             orders = self.orders[symbol]
             orders_to_process = list(orders)
-            
+
             for order in reversed(orders_to_process):
-            
                 symbol_l = order.symbol_l
                 symbol_s = order.symbol_s
 
-                price_l_now = self.price_history[symbol_l][-1] if self.price_history[symbol_l] else self.api.ticker_price(symbol_l).price
-                price_s_now = self.price_history[symbol_s][-1] if self.price_history[symbol_s] else self.api.ticker_price(symbol_s).price
+                price_l_now = (
+                    self.price_history[symbol_l][-1]
+                    if self.price_history[symbol_l]
+                    else self.api.ticker_price(symbol_l).price
+                )
+                price_s_now = (
+                    self.price_history[symbol_s][-1]
+                    if self.price_history[symbol_s]
+                    else self.api.ticker_price(symbol_s).price
+                )
 
                 price_l_his = order.price_l
                 price_s_his = order.price_s
 
-                order_profit = - (price_s_now - price_s_his) * float(order.quantity_s) + (price_l_now - price_l_his) * float(order.quantity_l)
+                order_profit = -(price_s_now - price_s_his) * float(
+                    order.quantity_s
+                ) + (price_l_now - price_l_his) * float(order.quantity_l)
 
-                if (order.time_l + self.forward_window < now and order.time_s + self.forward_window < now) or order_profit / self.bullet_size <= -self.stop_loss or order_profit / self.bullet_size >= self.take_profit:
+                if (
+                    (
+                        order.time_l + self.forward_window < now
+                        and order.time_s + self.forward_window < now
+                    )
+                    or order_profit / self.bullet_size <= -self.stop_loss
+                    or order_profit / self.bullet_size >= self.take_profit
+                ):
                     # Close long position
                     response_l = self.api.order_market(
                         order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
@@ -389,10 +398,6 @@ class Strategy(qoc.PersistableMixin):
                     # logger.warning("Closed SHORT order: %s", response)
 
                     self.orders[symbol].remove(order)
-
-
-                    
-
 
         self.t += 1
 
@@ -433,7 +438,10 @@ class Strategy(qoc.PersistableMixin):
             # Plot asset balance on primary y-axis
             for asset_name, balance_history in self.asset_history.items():
                 ax.plot(
-                    range(len(balance_history)), balance_history, "-", label=f"{asset_name} Balance"
+                    range(len(balance_history)),
+                    balance_history,
+                    "-",
+                    label=f"{asset_name} Balance",
                 )
             ax.set_xlabel("Time Steps")
             ax.set_ylabel("Balance (USDT)", color="tab:blue")
@@ -443,17 +451,17 @@ class Strategy(qoc.PersistableMixin):
             plt.savefig("examples/stat_arbi-usds/asset_metrics.png")
             plt.close()  # 关闭图表释放内存
 
-
             # plot temps
             plt.figure(figsize=(10, 5))
-            plt.plot(range(len(self.temps)), self.temps, label="Temp Value", color='orange')
+            plt.plot(
+                range(len(self.temps)), self.temps, label="Temp Value", color="orange"
+            )
             plt.xlabel("Time Steps")
             plt.ylabel("Temp Value")
             plt.title("Temp Value Over Time")
             plt.legend()
             plt.savefig("examples/stat_arbi-usds/temp_values.png")
             plt.close()
-
 
         # cherries.log_metrics(
         #     {

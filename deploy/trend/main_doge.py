@@ -16,8 +16,6 @@ from qoc.api.usds import ApiUsds, ApiUsdsOffline, ApiUsdsOnline
 from qoc.api.usds.models import Account, MarginType, OrderResponse, OrderSide
 from qoc.typing import SymbolName
 
-import pandas as pd  # For data handling in plotting
-
 logger = logging.getLogger(__name__)
 
 
@@ -37,10 +35,10 @@ class Strategy(qoc.PersistableMixin):
 
     # -------------------------------- Config -------------------------------- #
 
-    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=15))
+    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=24))
     """过去窗口"""
 
-    bullet_size: float = 50
+    bullet_size: float = 30
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
@@ -65,40 +63,34 @@ class Strategy(qoc.PersistableMixin):
     volumes: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
-    prices_ma: collections.defaultdict[str, deque[float]] = attrs.field(
-        factory=lambda: collections.defaultdict(deque)
-    )
-    prices_fft: collections.defaultdict[str, deque[float]] = attrs.field(
-        factory=lambda: collections.defaultdict(deque)
-    )
     """Historical prices for each symbol"""
 
-    prices_times_volumes_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    prices_times_volumes: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Historical price*volume products for each symbol"""
 
-    vwaps_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Historical VWAP values for each symbol"""
 
-    vwaps_deri_1_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_1: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """First derivative of VWAP for each symbol"""
 
-    vwaps_deri_2_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_2: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Second derivative of VWAP for each symbol"""
 
-    vwaps_deri_3_2: collections.defaultdict[str, deque[float]] = attrs.field(
+    vwaps_deri_3: collections.defaultdict[str, deque[float]] = attrs.field(
         factory=lambda: collections.defaultdict(deque)
     )
     """Third derivative of VWAP for each symbol"""
 
-    past_window_length: int = attrs.field(default=15 * 60)
+    past_window_length: int = attrs.field(default=1 * 24 * 60)
 
     # Track last logged date for daily logging
     last_logged_date: str = attrs.field(default="")
@@ -112,99 +104,31 @@ class Strategy(qoc.PersistableMixin):
         if len(self.volumes[symbol]) > self.past_window_length:
             self.volumes[symbol].popleft()
 
-        self.prices_ma[symbol].append(price)
-        if len(self.prices_ma[symbol]) > self.window_ma:
-            self.prices_ma[symbol].popleft()
+        self.prices_times_volumes[symbol].append(price * volume)
+        if len(self.prices_times_volumes[symbol]) > self.past_window_length:
+            self.prices_times_volumes[symbol].popleft()
 
-        self.prices_fft[symbol].append(
-            (price - np.mean(self.prices_ma[symbol]))
-            if len(self.prices_ma[symbol]) >= self.window_ma
-            else 0.0
+        self.vwaps[symbol].append(
+            sum(self.prices_times_volumes[symbol]) / sum(self.volumes[symbol])
         )
-        if len(self.prices_fft[symbol]) > self.window_fft:
-            self.prices_fft[symbol].popleft()
+        if len(self.vwaps[symbol]) > self.past_window_length:
+            self.vwaps[symbol].popleft()
 
-        if (
-            self.count[symbol] % 1 == 0
-            and len(self.prices_fft[symbol]) == self.window_fft
-        ):
-            fft_coeff = np.fft.fft(self.prices_fft[symbol])
-            freq = np.fft.fftfreq(
-                len(self.prices_fft[symbol])
-            )  # Pass length as integer
-            power = np.abs(fft_coeff)
+        self.vwaps_deri_1[symbol].append(self.vwaps[symbol][-1] - self.vwaps[symbol][0])
+        if len(self.vwaps_deri_1[symbol]) > self.past_window_length:
+            self.vwaps_deri_1[symbol].popleft()
 
-            idx_max = np.argsort(power)[-1]  # 最大能量的频率下标
-            idx_max_2 = np.argsort(power)[-2]  # 最大能量的频率下标
-            idx_max_3 = np.argsort(power)[-3]  # 最大能量的频率下标
-            idx_max_4 = np.argsort(power)[-4]  # 最大能量的频率下标
-            idx_max_5 = np.argsort(power)[-5]  # 最大能量的频率下标
-            per = []
-            for idx in [idx_max, idx_max_2, idx_max_3, idx_max_4, idx_max_5]:
-                freq_val = abs(freq[idx])
-                if freq_val != 0:
-                    period = 1 / freq_val
-                    per.append(period)
-
-            per = np.array(per)
-
-            self.period[symbol] = per[0]
-
-        self.prices_times_volumes_1[symbol].append(price * volume)
-        if len(self.prices_times_volumes_1[symbol]) > self.past_window_length_1:
-            self.prices_times_volumes_1[symbol].popleft()
-
-        self.vwaps_1[symbol].append(
-            sum(self.prices_times_volumes_1[symbol]) / sum(self.volumes_1[symbol])
+        self.vwaps_deri_2[symbol].append(
+            self.vwaps_deri_1[symbol][-1] - self.vwaps_deri_1[symbol][0]
         )
-        if len(self.vwaps_1[symbol]) > self.past_window_length_1:
-            self.vwaps_1[symbol].popleft()
+        if len(self.vwaps_deri_2[symbol]) > self.past_window_length:
+            self.vwaps_deri_2[symbol].popleft()
 
-        self.vwaps_deri_1_1[symbol].append(
-            self.vwaps_1[symbol][-1] - self.vwaps_1[symbol][0]
+        self.vwaps_deri_3[symbol].append(
+            self.vwaps_deri_2[symbol][-1] - self.vwaps_deri_2[symbol][0]
         )
-        if len(self.vwaps_deri_1_1[symbol]) > self.past_window_length_1:
-            self.vwaps_deri_1_1[symbol].popleft()
-
-        self.vwaps_deri_2_1[symbol].append(
-            self.vwaps_deri_1_1[symbol][-1] - self.vwaps_deri_1_1[symbol][0]
-        )
-        if len(self.vwaps_deri_2_1[symbol]) > self.past_window_length_1:
-            self.vwaps_deri_2_1[symbol].popleft()
-
-        self.vwaps_deri_3_1[symbol].append(
-            self.vwaps_deri_2_1[symbol][-1] - self.vwaps_deri_2_1[symbol][0]
-        )
-        if len(self.vwaps_deri_3_1[symbol]) > self.past_window_length_1:
-            self.vwaps_deri_3_1[symbol].popleft()
-
-        self.prices_times_volumes_2[symbol].append(price * volume)
-        if len(self.prices_times_volumes_2[symbol]) > self.past_window_length_2:
-            self.prices_times_volumes_2[symbol].popleft()
-
-        self.vwaps_2[symbol].append(
-            sum(self.prices_times_volumes_2[symbol]) / sum(self.volumes_2[symbol])
-        )
-        if len(self.vwaps_2[symbol]) > self.past_window_length_2:
-            self.vwaps_2[symbol].popleft()
-
-        self.vwaps_deri_1_2[symbol].append(
-            self.vwaps_2[symbol][-1] - self.vwaps_2[symbol][0]
-        )
-        if len(self.vwaps_deri_1_2[symbol]) > self.past_window_length_2:
-            self.vwaps_deri_1_2[symbol].popleft()
-
-        self.vwaps_deri_2_2[symbol].append(
-            self.vwaps_deri_1_2[symbol][-1] - self.vwaps_deri_1_2[symbol][0]
-        )
-        if len(self.vwaps_deri_2_2[symbol]) > self.past_window_length_2:
-            self.vwaps_deri_2_2[symbol].popleft()
-
-        self.vwaps_deri_3_2[symbol].append(
-            self.vwaps_deri_2_2[symbol][-1] - self.vwaps_deri_2_2[symbol][0]
-        )
-        if len(self.vwaps_deri_3_2[symbol]) > self.past_window_length_2:
-            self.vwaps_deri_3_2[symbol].popleft()
+        if len(self.vwaps_deri_3[symbol]) > self.past_window_length:
+            self.vwaps_deri_3[symbol].popleft()
 
     def __attrs_post_init__(self) -> None:
         """在所有字段初始化后执行的自定义初始化逻辑"""
@@ -213,13 +137,12 @@ class Strategy(qoc.PersistableMixin):
         # 可以在这里设置初始值或执行其他初始化逻辑
         for symbol in self.symbols:
             print(f"Initialized state for symbol: {symbol}")
-            self.past_window_length_1 = int(self.past_window_1.in_minutes())
-            self.past_window_length_2 = int(self.past_window_2.in_minutes())
+            self.past_window_length = int(self.past_window.in_minutes())
 
             now: DateTime = qoc.now()
 
             klines: pl.DataFrame = self.api.klines(
-                symbol, "1m", end_time=now, limit=self.past_window_length_1 * 4
+                symbol, "1m", end_time=now, limit=self.past_window_length * 4
             )
 
             prices = klines["close"].to_list()
@@ -248,14 +171,12 @@ class Strategy(qoc.PersistableMixin):
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
             self.update_indicators(symbol, price, volume)
-            # 周期1
+
             if (
                 self.vwaps_deri_1[symbol][-1] > 0
-                # and self.vwaps_deri_2[symbol][-1] > 0
+                and self.vwaps_deri_2[symbol][-1] > 0
                 # and self.vwaps_deri_3[symbol][-1] > 0
                 and len(orders) < self.max_holdings
-                and self.period[symbol] < 4000
-                # and self.period[symbol]>3000
             ):
                 quantity: float = self.bullet_size / price
 
@@ -274,11 +195,9 @@ class Strategy(qoc.PersistableMixin):
 
             if (
                 self.vwaps_deri_1[symbol][-1] < 0
-                # and self.vwaps_deri_2[symbol][-1] < 0
+                and self.vwaps_deri_2[symbol][-1] < 0
                 # and self.vwaps_deri_3[symbol][-1] < 0
                 and len(orders) < self.max_holdings
-                and self.period[symbol] < 4000
-                # and self.period[symbol]>3000
             ):
                 quantity: float = self.bullet_size / price
 
@@ -300,12 +219,10 @@ class Strategy(qoc.PersistableMixin):
                 and (
                     not (
                         self.vwaps_deri_1[symbol][-1] > 0
-                        # and self.vwaps_deri_2[symbol][-1] > 0
+                        and self.vwaps_deri_2[symbol][-1] > 0
                         # and self.vwaps_deri_3[symbol][-1] > 0
                     )
                 )
-                and self.period[symbol] < 3000
-                and self.period[symbol] > 1500
                 and orders[-1].direction == "BUY"
             ):
                 order: Order = orders[0]
@@ -321,12 +238,10 @@ class Strategy(qoc.PersistableMixin):
                 and (
                     not (
                         self.vwaps_deri_1[symbol][-1] < 0
-                        # and self.vwaps_deri_2[symbol][-1] < 0
+                        and self.vwaps_deri_2[symbol][-1] < 0
                         # and self.vwaps_deri_3[symbol][-1] < 0
                     )
                 )
-                and self.period[symbol] < 3000
-                and self.period[symbol] > 1500
                 and orders[-1].direction == "SELL"
             ):
                 order: Order = orders[0]
@@ -350,7 +265,6 @@ class Strategy(qoc.PersistableMixin):
         # Record current metrics
         for name, asset in account.assets.items():
             asset_metrics[name] = {"margin_balance": asset.margin_balance}
-
             # Store in history
             self.asset_history[name].append(asset.margin_balance)
             self.price_history[name].append(self.api.ticker_price("DOGEUSDT").price)
@@ -375,10 +289,6 @@ class Strategy(qoc.PersistableMixin):
                 ax1.plot(
                     self.time_steps, balance_history, "-", label=f"{asset_name} Balance"
                 )
-                balance_history_pd = pd.DataFrame(
-                    {"Time Steps": self.time_steps, "Balance": balance_history}
-                )
-                balance_history_pd.to_csv("examples/rev-usds/asset_balance_doge.csv")
             ax1.set_xlabel("Time Steps")
             ax1.set_ylabel("Balance (USDT)", color="tab:blue")
             ax1.tick_params(axis="y", labelcolor="tab:blue")
@@ -408,24 +318,24 @@ class Strategy(qoc.PersistableMixin):
             for symbol in self.symbols:
                 # Calculate the correct time steps for VWAP data
                 # VWAP data starts from negative indices (historical data)
-                vwap_length = len(self.vwaps_1[symbol])
+                vwap_length = len(self.vwaps[symbol])
                 current_step = self.time_steps[-1]
                 vwap_steps = list(
                     range(current_step - vwap_length + 1, current_step + 1)
                 )
 
                 ax3.plot(
-                    vwap_steps, list(self.vwaps_1[symbol]), "-", label=f"{symbol} VWAP"
+                    vwap_steps, list(self.vwaps[symbol]), "-", label=f"{symbol} VWAP"
                 )
                 ax3.plot(
                     vwap_steps,
-                    list(self.vwaps_deri_1_1[symbol]),
+                    list(self.vwaps_deri_1[symbol]),
                     "--",
                     label=f"{symbol} VWAP Deri 1",
                 )
                 ax3.plot(
                     vwap_steps,
-                    list(self.vwaps_deri_2_1[symbol]),
+                    list(self.vwaps_deri_2[symbol]),
                     "-.",
                     label=f"{symbol} VWAP Deri 2",
                 )
@@ -443,10 +353,10 @@ class Strategy(qoc.PersistableMixin):
         stats: dict[str, dict[str, float]] = {}
         for symbol in self.symbols:
             stats[symbol] = {
-                "vwap": self.vwaps_1[symbol][-1],
-                "vwap_deri_1": self.vwaps_deri_1_1[symbol][-1],
-                "vwap_deri_2": self.vwaps_deri_2_1[symbol][-1],
-                "vwap_deri_3": self.vwaps_deri_3_1[symbol][-1],
+                "vwap": self.vwaps[symbol][-1],
+                "vwap_deri_1": self.vwaps_deri_1[symbol][-1],
+                "vwap_deri_2": self.vwaps_deri_2[symbol][-1],
+                "vwap_deri_3": self.vwaps_deri_3[symbol][-1],
             }
         cherries.log_metrics(
             {
@@ -466,7 +376,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_parameter("group_key", "Trend USDS 2026-01-03 DOGE")
+    cherries.log_param("group_key", "Trend DOGEUSDT 2025-12-27")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
