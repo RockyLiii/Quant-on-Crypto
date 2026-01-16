@@ -4,7 +4,6 @@ import asyncio
 import enum
 import io
 import re
-import urllib
 import urllib.parse
 import zipfile
 from collections.abc import Awaitable
