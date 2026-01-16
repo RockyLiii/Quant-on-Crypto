@@ -29,17 +29,8 @@ async def main() -> None:
 
     with grapes.timer(label="klines()"):
         # fetch klines for multiple symbols concurrently
-        klines: dict[str, pl.DataFrame] = dict(
-            zip(
-                symbols,
-                await asyncio.gather(
-                    *[
-                        market_data.klines(symbol, interval, start, end)
-                        for symbol in symbols
-                    ]
-                ),
-                strict=True,
-            )
+        klines: dict[str, pl.DataFrame] = await market_data.klines_batch(
+            symbols, interval, start, end
         )
     for symbol, data in klines.items():
         print(f"--- {symbol} ---")
