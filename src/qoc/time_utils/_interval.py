@@ -1,7 +1,7 @@
 import enum
+import functools
 import re
 
-import attrs
 import pendulum
 from liblaf import grapes
 
@@ -25,7 +25,7 @@ class IntervalUnit(enum.StrEnum):
         return None
 
 
-@attrs.define
+@grapes.attrs.frozen
 class Interval:
     count: int
     unit: IntervalUnit
@@ -43,7 +43,7 @@ class Interval:
         unit: IntervalUnit = IntervalUnit(matched.group("unit"))
         return cls(count=count, unit=unit)
 
-    @property
+    @functools.cached_property
     def duration(self) -> pendulum.Duration:
         match self.unit:
             case IntervalUnit.MONTHS:
@@ -61,7 +61,7 @@ class Interval:
             case _:
                 raise grapes.MatchError(self.unit)
 
-    @property
+    @functools.cached_property
     def zero(self) -> pendulum.DateTime:
         # Monday, aligned with 3d interval
         return pendulum.datetime(year=2001, month=1, day=1)

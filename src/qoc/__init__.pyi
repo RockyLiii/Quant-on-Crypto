@@ -21,7 +21,13 @@ from .api import (
 )
 from .balance import Balance
 from .database import Database, Library
-from .market import Market, MarketDataFuturesUsds, MarketDataSpot
+from .market import (
+    BinanceDataCollection,
+    BinanceDataCollectionFuturesUm,
+    BinanceDataCollectionSpot,
+    BinanceMarketData,
+    MarketDataBinanceSdkFuturesUm,
+)
 from .strategy import PersistableMixin, Strategy, StrategySingleSymbol
 from .time_utils import (
     Clock,
@@ -60,6 +66,10 @@ __all__ = [
     "ApiOfflineFutures",
     "ApiOfflineSpot",
     "Balance",
+    "BinanceDataCollection",
+    "BinanceDataCollectionFuturesUm",
+    "BinanceDataCollectionSpot",
+    "BinanceMarketData",
     "Clock",
     "ClockOffline",
     "ClockOnline",
@@ -69,9 +79,7 @@ __all__ = [
     "IntervalLike",
     "IntervalUnit",
     "Library",
-    "Market",
-    "MarketDataFuturesUsds",
-    "MarketDataSpot",
+    "MarketDataBinanceSdkFuturesUm",
     "PersistableMixin",
     "Strategy",
     "StrategySingleSymbol",

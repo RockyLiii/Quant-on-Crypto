@@ -11,7 +11,6 @@ from binance_sdk_derivatives_trading_usds_futures.rest_api import (
 from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     KlineCandlestickDataIntervalEnum,
 )
-from loguru import logger
 from polars._typing import SchemaDefinition
 
 import qoc.time_utils as tu

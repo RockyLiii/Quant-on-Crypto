@@ -1,6 +1,7 @@
 import datetime
 
 import pendulum
+import polars as pl
 
 from ._unit import TimeUnit, TimeUnitLike, infer_timestamp_unit
 
@@ -23,6 +24,28 @@ def as_datetime(
 ) -> pendulum.DateTime:
     time: pendulum.DateTime = _as_datetime(time, unit=unit)
     return time.astimezone(tz)
+
+
+def as_polars_datetime(
+    time: DateTimeLike,
+    *,
+    unit: TimeUnitLike = TimeUnit.MILLISECOND,
+    tz: datetime.tzinfo | None = pendulum.UTC,
+) -> pl.Expr:
+    time: pendulum.DateTime = _as_datetime(time, unit=unit)
+    unit = TimeUnit(unit)
+    assert unit is not TimeUnit.SECOND
+    return pl.datetime(
+        year=time.year,
+        month=time.month,
+        day=time.day,
+        hour=time.hour,
+        minute=time.minute,
+        second=time.second,
+        microsecond=time.microsecond,
+        time_unit=unit.value,
+        time_zone=str(tz),
+    )
 
 
 def as_timestamp(time: DateTimeLike, unit: TimeUnitLike = TimeUnit.SECOND) -> float:

@@ -1,5 +1,5 @@
 from . import clock
-from ._datetime import DateTimeLike, as_datetime, as_timestamp
+from ._datetime import DateTimeLike, as_datetime, as_polars_datetime, as_timestamp
 from ._interval import (
     Interval,
     IntervalLike,
@@ -21,6 +21,7 @@ __all__ = [
     "IntervalUnit",
     "TimeUnit",
     "as_datetime",
+    "as_polars_datetime",
     "as_timestamp",
     "clock",
     "datetime_to_index_ceil",

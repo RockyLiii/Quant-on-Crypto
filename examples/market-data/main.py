@@ -1,28 +1,50 @@
-import pendulum
+import asyncio
+
 import polars as pl
+from liblaf import grapes
 
-import qoc
+from qoc.market import (
+    BinanceDataCollectionFuturesUm,
+    BinanceMarketData,
+    MarketDataBinanceSdkFuturesUm,
+)
 
 
-def main() -> None:
-    qoc.set_clock(qoc.ClockOnline("1m"))
-    data_spot = qoc.MarketDataSpot()
-    data_usds = qoc.MarketDataFuturesUsds()
-    klines_spot: pl.DataFrame = data_spot.klines(
-        "BTCUSDT",
-        "1m",
-        start=pendulum.datetime(2020, 1, 1),
-        end=pendulum.datetime(2020, 1, 2),
-    )
-    klines_usds: pl.DataFrame = data_usds.klines(
-        "BTCUSDT",
-        "1m",
-        start=pendulum.datetime(2020, 1, 1),
-        end=pendulum.datetime(2020, 1, 2),
-    )
-    print(klines_spot)
-    print(klines_usds)
+async def main() -> None:
+    # real-time data (REST API)
+    market_data: BinanceMarketData = MarketDataBinanceSdkFuturesUm()
+    # historical data, faster for large date ranges, but missing recent days
+    # queries are cached and stored locally on disk
+    # intended for backtesting & research
+    market_data: BinanceMarketData = BinanceDataCollectionFuturesUm()
+
+    symbols: list[str] = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+    interval: str = "1m"
+    start: str = "2025-01-01"
+    end: str = "2026-01-01"
+
+    # fetch klines for a single symbol
+    # queries are auto chunked and parallelized internally
+    data: pl.DataFrame = await market_data.klines("BTCUSDT", interval, start, end)
+
+    with grapes.timer(label="klines()"):
+        # fetch klines for multiple symbols concurrently
+        klines: dict[str, pl.DataFrame] = dict(
+            zip(
+                symbols,
+                await asyncio.gather(
+                    *[
+                        market_data.klines(symbol, interval, start, end)
+                        for symbol in symbols
+                    ]
+                ),
+                strict=True,
+            )
+        )
+    for symbol, data in klines.items():
+        print(f"--- {symbol} ---")
+        print(data)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

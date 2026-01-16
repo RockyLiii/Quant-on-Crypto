@@ -5,7 +5,7 @@ import pendulum
 from loguru import logger
 
 type PolarsTimeUnit = Literal["ns", "us", "ms"]
-type TimeUnitLike = Literal["s", "ms", "us", "ns"] | TimeUnit | str  # noqa: PYI051
+type TimeUnitLike = Literal["s", "ms", "us", "ns"] | TimeUnit
 
 
 class TimeUnit(enum.StrEnum):

@@ -437,9 +437,9 @@ if __name__ == "__main__":
     print(ac.list_libraries())
 
     coins = ["BTCUSDT", "DOGEUSDT"]
-    interval = "5m"
+    interval = "1m"
     start_date = "2025-01-01"
     end_date = "2025-06-01"
-    output_dir = "/Users/lizeyu/Desktop/qoc/tmp/raw/5m_klines_raw"
+    output_dir = "mmpair-strategy/1m_klines_raw"
 
     fetch_for_offline(coins, interval, start_date, end_date, output_dir, library)
