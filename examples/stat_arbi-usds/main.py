@@ -59,39 +59,39 @@ class Strategy(qoc.PersistableMixin):
             "ICPUSDT",
             "APTUSDT",
             "FILUSDT",
-            # "NEARUSDT",
-            # "HBARUSDT",
-            # "INJUSDT",
-            # "OPUSDT",
-            # "ARBUSDT",
-            # "SUIUSDT",
-            # "SEIUSDT",
-            # "RENDERUSDT",
-            # "TIAUSDT",
-            # "FTMUSDT",
-            # "EGLDUSDT",
-            # "AAVEUSDT",
-            # "GALAUSDT",
-            # "IMXUSDT",
-            # "PEPEUSDT",
-            # "SHIBUSDT",
-            # "FLOKIUSDT",
-            # "BONKUSDT",
-            # "WIFUSDT",
-            # "PENGUUSDT",
-            # "TRUMPUSDT",
-            # "POLUSDT",
-            # "ENSUSDT",
-            # "JUPUSDT",
-            # "PYTHUSDT",
-            # "ORDIUSDT",
-            # "SATOSHIUSDT",
-            # "SATSUSDT",
-            # "MOVRUSDT",
-            # "DYMUSDT",
-            # "NOTUSDT",
-            # "MAGAUSDT",
-            # "SPXUSDT",
+            "NEARUSDT",
+            "HBARUSDT",
+            "INJUSDT",
+            "OPUSDT",
+            "ARBUSDT",
+            "SUIUSDT",
+            "SEIUSDT",
+            "RENDERUSDT",
+            "TIAUSDT",
+            "FTMUSDT",
+            "EGLDUSDT",
+            "AAVEUSDT",
+            "GALAUSDT",
+            "IMXUSDT",
+            "PEPEUSDT",
+            "SHIBUSDT",
+            "FLOKIUSDT",
+            "BONKUSDT",
+            "WIFUSDT",
+            "PENGUUSDT",
+            "TRUMPUSDT",
+            "POLUSDT",
+            "ENSUSDT",
+            "JUPUSDT",
+            "PYTHUSDT",
+            "ORDIUSDT",
+            "SATOSHIUSDT",
+            "SATSUSDT",
+            "MOVRUSDT",
+            "DYMUSDT",
+            "NOTUSDT",
+            "MAGAUSDT",
+            "SPXUSDT",
         ]
     )
     # -------------------------------- Config -------------------------------- #
@@ -320,8 +320,11 @@ class Strategy(qoc.PersistableMixin):
         beta_l = coef_records[l_coin]["beta"]
         beta_s = coef_records[s_coin]["beta"]
 
-        q_l = beta_s * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
-        q_s = beta_l * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
+        # q_l = beta_s * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
+        # q_s = beta_l * self.bullet_size / (beta_l * price_s_now + beta_s * price_l_now)
+
+        q_l = self.bullet_size / 2 / price_l_now
+        q_s = self.bullet_size / 2 / price_s_now 
 
         if q_l > 0 and q_s > 0:
             # long
@@ -488,10 +491,10 @@ def main(cfg: Config) -> None:
         qoc.set_clock(qoc.ClockOnline("1m"))
         api = ApiUsdsOnline()
     else:
-        # qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-01", end="2026-01-03"))
-
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
+        # qoc.set_clock(qoc.ClockOffline("1m", start="2025-01-18", end="2025-08-31"))
         api = ApiUsdsOffline()
+        
     strategy = Strategy(api=api)
     strategy.init()
     strategy.load_state()
@@ -510,3 +513,4 @@ if __name__ == "__main__":
     main(Config())
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/stat_arbi-usds/main.py
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/stat_arbi-usds/main.py

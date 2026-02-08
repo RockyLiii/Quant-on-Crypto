@@ -1,7 +1,9 @@
 import collections
 from decimal import Decimal
+from typing import Dict, List
 
 import attrs
+import matplotlib.pyplot as plt
 import pendulum
 import polars as pl
 from environs import env
@@ -49,6 +51,13 @@ class Strategy(qoc.PersistableMixin):
     orders: collections.defaultdict[str, collections.deque[Order]] = attrs.field(
         factory=lambda: collections.defaultdict(collections.deque)
     )
+    
+    # 新增：时间序列数据
+    asset_time_series: List[Dict] = attrs.field(factory=list)
+    """资产时间序列数据"""
+    
+    plot_counter: int = 0
+    """绘图计数器"""
 
     def init(self) -> None:
         self.api.change_multi_assets_mode(multi_assets_margin=False)
@@ -93,15 +102,30 @@ class Strategy(qoc.PersistableMixin):
         step: int = clock.step
         account: Account = self.api.account()
         asset_metrics: dict[str, dict[str, float]] = {}
-        # position_metrics: dict[str, dict[str, float]] = {}
+        
+        # 收集资产数据
+        total_balance = 0.0
         for name, asset in account.assets.items():
-            asset_metrics[name] = {"margin_balance": asset.margin_balance}
-        # for symbol, position in account.positions.items():
-        #     position_metrics[symbol] = {
-        #         "position_amt": position.position_amt,
-        #         "isolated_margin": position.isolated_margin,
-        #         "isolated_wallet": position.isolated_wallet,
-        #     }
+            balance = asset.margin_balance
+            asset_metrics[name] = {"margin_balance": balance}
+            total_balance += balance
+
+        # 记录时间序列数据
+        self.asset_time_series.append({
+            "timestamp": now.timestamp(),
+            "datetime": now,
+            "step": step,
+            "total_balance": total_balance,
+            "asset_metrics": asset_metrics.copy(),
+            "open_orders": len(self.orders["BTCUSDT"]),
+            "total_positions": sum(len(orders) for orders in self.orders.values()),
+            "price": self.api.ticker_price("BTCUSDT").price
+        })
+
+        # 每1000步创建一次PNL曲线图
+        if step > 0 and step % 1000 == 0:
+            self.create_pnl_chart()
+
         cherries.log_metrics(
             {
                 "assets": asset_metrics,
@@ -109,25 +133,61 @@ class Strategy(qoc.PersistableMixin):
                 "price": self.api.ticker_price("BTCUSDT").price,
                 "time": now.timestamp(),
                 "positions": sum(len(orders) for orders in self.orders.values()),
-                # "positions": position_metrics,
+                "total_balance": total_balance,
             },
             step=step,
         )
+        # print(f"[{now}] step={step} assets={asset_metrics} open_orders={len(self.orders['BTCUSDT'])} positions={sum(len(orders) for orders in self.orders.values())} total_balance={total_balance:.2f}")
+
+    def create_pnl_chart(self) -> None:
+        """创建PNL曲线图"""
+        if len(self.asset_time_series) < 2:
+            return
+            
+        self.plot_counter += 1
+        
+        # 提取数据
+        datetimes = [point["datetime"] for point in self.asset_time_series]
+        total_balances = [point["total_balance"] for point in self.asset_time_series]
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # 绘制总余额曲线
+        ax.plot(datetimes, total_balances, 'g-', linewidth=2, label='Total Balance')
+        ax.set_ylabel('Total Balance (USDT)', color='green')
+        ax.set_xlabel('Time')
+        ax.tick_params(axis='y', labelcolor='green')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+        ax.set_title(f'Total Balance - Step {self.asset_time_series[-1]["step"]} - Chart #{self.plot_counter}')
+        
+        # 旋转时间标签
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+        plt.tight_layout()
+        
+        # 保存图表
+        filename = "balance_chart.png"
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Balance chart saved: {filename}")
+        print(f"Current Total Balance: {total_balances[-1]:.2f} USDT")
 
 
 class Config(cherries.BaseConfig):
-    online: bool = env.bool("ONLINE", False)
-
+    online: bool = False
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "Rev USDS 2025-12-18")
+    # cherries.log_param("group_key", "Rev USDS 2025-12-18")
     env.read_env(verbose=True, override=True)
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("5m"))
         api = ApiUsdsOnline()
     else:
-        qoc.set_clock(qoc.ClockOffline("5m", start="2024-01-01", end="2025-01-01"))
+        qoc.set_clock(qoc.ClockOffline("5m", start="2025-10-01", end="2026-01-03"))
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
@@ -142,4 +202,7 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    cherries.main(main)
+    # cherries.main(main)
+    main(Config())
+
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python deploy/rev-usds/main.py

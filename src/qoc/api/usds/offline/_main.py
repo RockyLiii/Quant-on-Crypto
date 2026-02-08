@@ -68,7 +68,7 @@ class Position:
 class ApiUsdsOffline(ApiUsds):
     _online: ApiUsdsOnline = attrs.field(factory=ApiUsdsOnline)
     _assets: dict[AssetName, Asset] = attrs.field(
-        factory=lambda: {"USDT": Asset(asset="USDT", available_balance=5000.0)}
+        factory=lambda: {"USDT": Asset(asset="USDT", available_balance=500000.0)}
     )
     _positions: dict[SymbolName, Position] = attrs.field(factory=dict)
 
@@ -133,7 +133,8 @@ class ApiUsdsOffline(ApiUsds):
             symbol,
             Position(symbol=symbol, position_amt=Decimal(0), isolated_wallet=0.0),
         )
-        commission_rate: float = self.commission_rate(symbol).taker
+        # commission_rate: float = self.commission_rate(symbol).taker
+        commission_rate: float = 0
         commission: float = commission_rate * abs(notional)
         asset.available_balance -= notional + commission
         position.position_amt += quantity
@@ -193,5 +194,5 @@ class ApiUsdsOffline(ApiUsds):
 
     def commission_rate(self, symbol: SymbolName) -> CommissionRate:
         return CommissionRate(
-            symbol=symbol, makerCommissionRate=0.0002, takerCommissionRate=0.0004
+            symbol=symbol, makerCommissionRate=0.0002, takerCommissionRate=0.0005
         )

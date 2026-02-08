@@ -9,10 +9,9 @@ from qoc.market import (
     MarketDataBinanceSdkFuturesUm,
 )
 
-
 async def main() -> None:
     # real-time data (REST API)
-    market_data: BinanceMarketData = MarketDataBinanceSdkFuturesUm()
+    # market_data: BinanceMarketData = MarketDataBinanceSdkFuturesUm()
     # historical data, faster for large date ranges, but missing recent days
     # queries are cached and stored locally on disk
     # intended for backtesting & research
@@ -27,7 +26,7 @@ async def main() -> None:
     # queries are auto chunked and parallelized internally
     data: pl.DataFrame = await market_data.klines("BTCUSDT", interval, start, end)
 
-    with grapes.timer(label="klines()"):
+    with grapes.timer():
         # fetch klines for multiple symbols concurrently
         klines: dict[str, pl.DataFrame] = await market_data.klines_batch(
             symbols, interval, start, end

@@ -96,9 +96,9 @@ class Strategy(qoc.PersistableMixin):
     )
     # -------------------------------- Config -------------------------------- #
 
-    forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=6))
+    forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=24))
 
-    back_window_in_mins: int = 12
+    back_window_in_mins: int = 24
 
     back_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=12))
 

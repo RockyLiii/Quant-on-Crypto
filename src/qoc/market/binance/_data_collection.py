@@ -56,7 +56,9 @@ def _default_client() -> httpx.AsyncClient:
     )
 
 
-@grapes.attrs.define
+from attrs import define
+
+@define
 class BinanceDataCollection(BinanceMarketData):
     base_url: str = attrs.field(kw_only=True)
     cache_dir: Path = attrs.field(
