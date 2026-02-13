@@ -118,10 +118,11 @@ class Strategy(qoc.PersistableMixin):
 
     back_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=120))
 
-    bullet_size: float = 5000
+    bullet_size: float = 100
+    max_concurrent_orders: int = 2
 
-    stop_loss: float = 99999  # 5%
-    take_profit: float = 99999  # 10%
+    stop_loss: float = 0.02  
+    take_profit: float = 0.10
 
 
     # --------------------------------- State -------------------------------- #
@@ -217,6 +218,7 @@ class Strategy(qoc.PersistableMixin):
 
     # temp:
     y_pred: float = 0.0
+    count: int = 0
 
 
     def update_indicators(
@@ -327,7 +329,7 @@ class Strategy(qoc.PersistableMixin):
 
 
         # import model 
-        self.model_trained = pickle.load(open('examples/stat_arbi-usds/random_forest_model.pkl', 'rb'))
+        self.model_trained = pickle.load(open('examples/stat_arbi-usds/random_forest_model_rct.pkl', 'rb'))
         self.feature_order = self.model_trained.feature_names_in_.tolist()
 
         # Initialize all symbol-based dictionaries first
@@ -539,7 +541,8 @@ class Strategy(qoc.PersistableMixin):
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
 
-        if q_l > 0 and q_s > 0 and self.y_pred > 15:
+        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders[l_coin]) < self.max_concurrent_orders:
+            self.count += 1
             # long
             response_l: OrderResponse = self.api.order_market(
                 l_coin, OrderSide.BUY, quantity=q_l
@@ -645,6 +648,7 @@ class Strategy(qoc.PersistableMixin):
         self.temps.append(self.y_pred)
 
         if self.t % 60 == 0:
+            logger.info("Logging stats at step %d: count: %d: temp: %f", step, self.count, self.y_pred)
             import matplotlib.pyplot as plt
 
             # Create figure with 2 subplots
@@ -679,6 +683,7 @@ class Strategy(qoc.PersistableMixin):
             plt.savefig("examples/stat_arbi-usds/temp_values.png")
             plt.close()
 
+
         # cherries.log_metrics(
         #     {
         #         "assets": asset_metrics,
@@ -705,7 +710,7 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOnline()
     else:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2026-01-10", end="2026-02-07"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2026-01-18", end="2026-02-09"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-11-18", end="2026-02-09"))
         api = ApiUsdsOffline()
         
     strategy = Strategy(api=api)
