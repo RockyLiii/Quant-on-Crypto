@@ -124,11 +124,11 @@ class Strategy(qoc.PersistableMixin):
     stop_loss: float = 0.02  
     take_profit: float = 0.10
 
+    freeze_window: int = 60  # in minutes
+
 
     # --------------------------------- State -------------------------------- #
-    orders: collections.defaultdict[str, deque[Order]] = attrs.field(
-        factory=lambda: collections.defaultdict(deque)
-    )
+    orders: deque[Order] = attrs.field(factory=deque)
 
     temp: float = 0.0
     temps: list[float] = attrs.field(factory=list)
@@ -219,6 +219,8 @@ class Strategy(qoc.PersistableMixin):
     # temp:
     y_pred: float = 0.0
     count: int = 0
+
+    freeze: int = 0
 
 
     def update_indicators(
@@ -430,7 +432,7 @@ class Strategy(qoc.PersistableMixin):
 
         for symbol in self.symbols:
 
-            orders = self.orders[symbol]
+            orders = self.orders
             klines: pl.DataFrame = self.api.klines(symbol, "1m", end_time=now, limit=2)
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
@@ -541,7 +543,7 @@ class Strategy(qoc.PersistableMixin):
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
 
-        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders[l_coin]) < self.max_concurrent_orders:
+        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders) < self.max_concurrent_orders:
             self.count += 1
             # long
             response_l: OrderResponse = self.api.order_market(
@@ -557,7 +559,7 @@ class Strategy(qoc.PersistableMixin):
             ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
 
             # logger.warning("Placed BUY order: %s", response)
-            self.orders[l_coin].append(
+            self.orders.append(
                 Order(
                     price_l=price_l_now,
                     quantity_l=abs(response_l.orig_qty),
@@ -570,53 +572,60 @@ class Strategy(qoc.PersistableMixin):
                 )
             )
 
-        for symbol in self.symbols:
-            orders = self.orders[symbol]
-            orders_to_process = list(orders)
+        orders = self.orders
+        orders_to_process = list(orders)
 
-            for order in reversed(orders_to_process):
-                symbol_l = order.symbol_l
-                symbol_s = order.symbol_s
+        if self.freeze != 0:
+            self.freeze += 1
+        if self.freeze > self.freeze_window:
+            self.freeze = 0
 
-                price_l_now = (
-                    self.price_history[symbol_l][-1]
-                    if self.price_history[symbol_l]
-                    else self.api.ticker_price(symbol_l).price
+        for order in reversed(orders_to_process):
+            symbol_l = order.symbol_l
+            symbol_s = order.symbol_s
+
+            price_l_now = (
+                self.price_history[symbol_l][-1]
+                if self.price_history[symbol_l]
+                else self.api.ticker_price(symbol_l).price
+            )
+            price_s_now = (
+                self.price_history[symbol_s][-1]
+                if self.price_history[symbol_s]
+                else self.api.ticker_price(symbol_s).price
+            )
+
+            price_l_his = order.price_l
+            price_s_his = order.price_s
+
+            order_profit = -(price_s_now - price_s_his) * float(
+                order.quantity_s
+            ) + (price_l_now - price_l_his) * float(order.quantity_l)
+
+            if order_profit / self.bullet_size <= -self.stop_loss:
+                self.freeze = 1
+
+            if (
+                (
+                    order.time_l + self.forward_window < now
+                    and order.time_s + self.forward_window < now
                 )
-                price_s_now = (
-                    self.price_history[symbol_s][-1]
-                    if self.price_history[symbol_s]
-                    else self.api.ticker_price(symbol_s).price
+                or order_profit / self.bullet_size <= -self.stop_loss
+                or order_profit / self.bullet_size >= self.take_profit
+            ):
+                # Close long position
+                response_l = self.api.order_market(
+                    order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
                 )
+                # logger.warning("Closed LONG order: %s", response)
 
-                price_l_his = order.price_l
-                price_s_his = order.price_s
+                # Close short position
+                response_s = self.api.order_market(
+                    order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
+                )
+                # logger.warning("Closed SHORT order: %s", response)
 
-                order_profit = -(price_s_now - price_s_his) * float(
-                    order.quantity_s
-                ) + (price_l_now - price_l_his) * float(order.quantity_l)
-
-                if (
-                    (
-                        order.time_l + self.forward_window < now
-                        and order.time_s + self.forward_window < now
-                    )
-                    or order_profit / self.bullet_size <= -self.stop_loss
-                    or order_profit / self.bullet_size >= self.take_profit
-                ):
-                    # Close long position
-                    response_l = self.api.order_market(
-                        order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
-                    )
-                    # logger.warning("Closed LONG order: %s", response)
-
-                    # Close short position
-                    response_s = self.api.order_market(
-                        order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
-                    )
-                    # logger.warning("Closed SHORT order: %s", response)
-
-                    self.orders[symbol].remove(order)
+                self.orders.remove(order)
 
         self.t += 1
 
@@ -710,7 +719,7 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOnline()
     else:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2026-01-10", end="2026-02-07"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-11-18", end="2026-02-09"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2026-02-11", end="2026-02-22"))
         api = ApiUsdsOffline()
         
     strategy = Strategy(api=api)
