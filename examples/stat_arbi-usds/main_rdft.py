@@ -1,11 +1,15 @@
 import collections
 import logging
+import pickle
 from collections import deque
 from decimal import Decimal
 
 import attrs
+import numpy as np
+import pandas as pd
 import pendulum
 import polars as pl
+from environs import env
 from liblaf import cherries
 from pendulum import DateTime, Duration
 
@@ -15,12 +19,8 @@ from qoc.api.usds import ApiUsds, ApiUsdsOffline, ApiUsdsOnline
 from qoc.api.usds.models import Account, MarginType, OrderResponse, OrderSide
 from qoc.typing import SymbolName
 
-import numpy as np
-import pandas as pd
-
-import pickle
-
 logger = logging.getLogger(__name__)
+
 
 @attrs.frozen
 class Order:
@@ -109,10 +109,12 @@ class Strategy(qoc.PersistableMixin):
         ]
     )
 
-    windows_ratio = [0.25, 0.5 , 1, 4, 16, 64, 256]
+    windows_ratio = [0.25, 0.5, 1, 4, 16, 64, 256]
     preload_window: int = 30720
 
-    forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=30))
+    forward_window: Duration = attrs.field(
+        factory=lambda: pendulum.duration(minutes=30)
+    )
 
     back_window_in_mins: int = 120
 
@@ -121,11 +123,10 @@ class Strategy(qoc.PersistableMixin):
     bullet_size: float = 100
     max_concurrent_orders: int = 2
 
-    stop_loss: float = 0.04  
+    stop_loss: float = 0.04
     take_profit: float = 0.04
 
     freeze_window: int = 30  # in minutes
-
 
     # --------------------------------- State -------------------------------- #
     orders: deque[Order] = attrs.field(factory=deque)
@@ -172,7 +173,6 @@ class Strategy(qoc.PersistableMixin):
 
     model_input_dict: dict[str, float] = attrs.field(factory=dict)
 
-
     # # features
     # close_ret
     log_close: dict[str, dict] = attrs.field(factory=dict)
@@ -215,13 +215,11 @@ class Strategy(qoc.PersistableMixin):
 
     std: dict[str, dict] = attrs.field(factory=dict)
 
-
     # temp:
     y_pred: float = 0.0
     count: int = 0
 
     freeze: int = 0
-
 
     def update_indicators(
         self,
@@ -231,7 +229,7 @@ class Strategy(qoc.PersistableMixin):
         btc_price: float,
         btc_volume: float,
         high: float,
-        low: float
+        low: float,
     ):
         """Update price and volume based indicators"""
 
@@ -273,15 +271,21 @@ class Strategy(qoc.PersistableMixin):
         # Update states for features
         for w in self.windows:
             # state arrays
-            last_log_close = self.log_close[symbol][w][-1] if len(self.log_close[symbol][w]) > 0 else np.log(price)
+            last_log_close = (
+                self.log_close[symbol][w][-1]
+                if len(self.log_close[symbol][w]) > 0
+                else np.log(price)
+            )
 
             self.log_close[symbol][w].append(np.log(price))
 
             log_price_diff = np.log(price) - last_log_close
             self.log_close_diff[symbol][w].append(log_price_diff)
             self.log_close_diff_sqr[symbol][w].append(log_price_diff**2)
-            
-            last_close = self.closes[symbol][w][-1] if len(self.closes[symbol][w]) > 0 else price
+
+            last_close = (
+                self.closes[symbol][w][-1] if len(self.closes[symbol][w]) > 0 else price
+            )
             tr = max(high - low, abs(high - last_close), abs(low - last_close))
             self.tr[symbol][w].append(tr)
             self.highs[symbol][w].append(high)
@@ -290,21 +294,48 @@ class Strategy(qoc.PersistableMixin):
             self.closes[symbol][w].append(self.coin_closes[symbol][-1])
 
             # states
-            self.log_close_tail_minus_head[symbol][w] = self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
-            self.tr_sum[symbol][w] = sum(self.tr[symbol][w])    
+            self.log_close_tail_minus_head[symbol][w] = (
+                self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
+            )
+            self.tr_sum[symbol][w] = sum(self.tr[symbol][w])
             self.highs_max[symbol][w] = max(self.highs[symbol][w])
             self.lows_min[symbol][w] = min(self.lows[symbol][w])
             self.log_close_diff_sum[symbol][w] = sum(self.log_close_diff[symbol][w])
-            self.log_close_diff_sqr_sum[symbol][w] = sum(self.log_close_diff_sqr[symbol][w])
+            self.log_close_diff_sqr_sum[symbol][w] = sum(
+                self.log_close_diff_sqr[symbol][w]
+            )
 
             # features
-            self.close_ret[symbol][w] = self.log_close_tail_minus_head[symbol][w] if self.log_close_tail_minus_head[symbol][w] != 0 else 0
+            self.close_ret[symbol][w] = (
+                self.log_close_tail_minus_head[symbol][w]
+                if self.log_close_tail_minus_head[symbol][w] != 0
+                else 0
+            )
 
-            self.cmi[symbol][w] = 100 * np.log(self.tr_sum[symbol][w] / (self.highs_max[symbol][w] - self.lows_min[symbol][w]))  / np.log(w) if self.tr_sum[symbol][w] != 0 and self.highs_max[symbol][w] != self.lows_min[symbol][w] else 0
+            self.cmi[symbol][w] = (
+                100
+                * np.log(
+                    self.tr_sum[symbol][w]
+                    / (self.highs_max[symbol][w] - self.lows_min[symbol][w])
+                )
+                / np.log(w)
+                if self.tr_sum[symbol][w] != 0
+                and self.highs_max[symbol][w] != self.lows_min[symbol][w]
+                else 0
+            )
 
-            self.atr[symbol][w] = self.tr_sum[symbol][w] / w if self.tr_sum[symbol][w] != 0 else 0
+            self.atr[symbol][w] = (
+                self.tr_sum[symbol][w] / w if self.tr_sum[symbol][w] != 0 else 0
+            )
 
-            self.std[symbol][w] = np.sqrt(self.log_close_diff_sqr_sum[symbol][w] / w - (self.log_close_diff_sum[symbol][w] / w)**2) if w > 1 else 0
+            self.std[symbol][w] = (
+                np.sqrt(
+                    self.log_close_diff_sqr_sum[symbol][w] / w
+                    - (self.log_close_diff_sum[symbol][w] / w) ** 2
+                )
+                if w > 1
+                else 0
+            )
 
     def __attrs_post_init__(self) -> None:
         """Initialize symbol-based dictionaries after object creation"""
@@ -313,12 +344,29 @@ class Strategy(qoc.PersistableMixin):
         for ratio in self.windows_ratio:
             self.windows.append(int(self.back_window_in_mins * ratio))
         # states for features
-        for state in [self.log_close, self.close_x_vol, self.tr, self.highs, self.lows, self.closes, self.close_sqr, self.log_close_diff, self.log_close_diff_sqr]:
+        for state in [
+            self.log_close,
+            self.close_x_vol,
+            self.tr,
+            self.highs,
+            self.lows,
+            self.closes,
+            self.close_sqr,
+            self.log_close_diff,
+            self.log_close_diff_sqr,
+        ]:
             for symbol in self.symbols:
                 state[symbol] = {}
                 for w in self.windows:
                     state[symbol][w] = deque(maxlen=w)
-        for state_result in [self.log_close_tail_minus_head, self.tr_sum, self.highs_max, self.lows_min, self.log_close_diff_sum, self.log_close_diff_sqr_sum]:
+        for state_result in [
+            self.log_close_tail_minus_head,
+            self.tr_sum,
+            self.highs_max,
+            self.lows_min,
+            self.log_close_diff_sum,
+            self.log_close_diff_sqr_sum,
+        ]:
             for symbol in self.symbols:
                 state_result[symbol] = {}
                 for w in self.windows:
@@ -329,9 +377,10 @@ class Strategy(qoc.PersistableMixin):
                 for w in self.windows:
                     feature[symbol][w] = 0.0
 
-
-        # import model 
-        self.model_trained = pickle.load(open('examples/stat_arbi-usds/random_forest_model_rct.pkl', 'rb'))
+        # import model
+        self.model_trained = pickle.load(
+            open("examples/stat_arbi-usds/random_forest_model_rct.pkl", "rb")
+        )
         self.feature_order = self.model_trained.feature_names_in_.tolist()
 
         # Initialize all symbol-based dictionaries first
@@ -377,7 +426,13 @@ class Strategy(qoc.PersistableMixin):
 
                 for i in range(len(prices)):
                     self.update_indicators(
-                        symbol, prices[i], volumes[i], btc_prices[i], btc_volumes[i], highs[i], lows[i]
+                        symbol,
+                        prices[i],
+                        volumes[i],
+                        btc_prices[i],
+                        btc_volumes[i],
+                        highs[i],
+                        lows[i],
                     )
 
             except Exception as e:
@@ -408,8 +463,6 @@ class Strategy(qoc.PersistableMixin):
                 f"Removed {len(symbols_to_remove)} symbols due to data loading failures: {symbols_to_remove}"
             )
 
-
-
     def init(self) -> None:
         try:
             self.api.change_multi_assets_mode(multi_assets_margin=False)
@@ -431,25 +484,62 @@ class Strategy(qoc.PersistableMixin):
         coef_records = {}
 
         for symbol in self.symbols:
-
             orders = self.orders
             klines: pl.DataFrame = self.api.klines(symbol, "1m", end_time=now, limit=2)
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
             high: float = klines["high"].last()  # pyright: ignore[reportAssignmentType]
             low: float = klines["low"].last()  # pyright: ignore[reportAssignmentType]
-            self.update_indicators(symbol, price, volume, btc_price, btc_volume, high, low)
-
-
+            self.update_indicators(
+                symbol, price, volume, btc_price, btc_volume, high, low
+            )
 
             beta = self.xy_1_sum[symbol] / self.xx_1_sum[symbol]
 
             residual = price - (beta * btc_price)
 
-            corr = (self.back_window_in_mins * self.xy_1_sum[symbol] - self.x_1_sum[symbol]*self.y_1_sum[symbol]) / np.sqrt((self.back_window_in_mins*self.xx_1_sum[symbol]-self.x_1_sum[symbol]**2)*(self.back_window_in_mins*self.yy_1_sum[symbol]-self.y_1_sum[symbol]**2)) if (self.back_window_in_mins*self.xx_1_sum[symbol]-self.x_1_sum[symbol]**2)*(self.back_window_in_mins*self.yy_1_sum[symbol]-self.y_1_sum[symbol]**2) !=0 else 0
+            corr = (
+                (
+                    self.back_window_in_mins * self.xy_1_sum[symbol]
+                    - self.x_1_sum[symbol] * self.y_1_sum[symbol]
+                )
+                / np.sqrt(
+                    (
+                        self.back_window_in_mins * self.xx_1_sum[symbol]
+                        - self.x_1_sum[symbol] ** 2
+                    )
+                    * (
+                        self.back_window_in_mins * self.yy_1_sum[symbol]
+                        - self.y_1_sum[symbol] ** 2
+                    )
+                )
+                if (
+                    self.back_window_in_mins * self.xx_1_sum[symbol]
+                    - self.x_1_sum[symbol] ** 2
+                )
+                * (
+                    self.back_window_in_mins * self.yy_1_sum[symbol]
+                    - self.y_1_sum[symbol] ** 2
+                )
+                != 0
+                else 0
+            )
             # debug
-            if (self.back_window_in_mins*self.xx_1_sum[symbol]-self.x_1_sum[symbol]**2)*(self.back_window_in_mins*self.yy_1_sum[symbol]-self.y_1_sum[symbol]**2)<=0:
-                logger.warning("Zero division in corr calculation for %s", symbol, self.back_window_in_mins*self.xx_1_sum[symbol], self.x_1_sum[symbol], self.back_window_in_mins*self.yy_1_sum[symbol], self.y_1_sum[symbol])
+            if (
+                self.back_window_in_mins * self.xx_1_sum[symbol]
+                - self.x_1_sum[symbol] ** 2
+            ) * (
+                self.back_window_in_mins * self.yy_1_sum[symbol]
+                - self.y_1_sum[symbol] ** 2
+            ) <= 0:
+                logger.warning(
+                    "Zero division in corr calculation for %s",
+                    symbol,
+                    self.back_window_in_mins * self.xx_1_sum[symbol],
+                    self.x_1_sum[symbol],
+                    self.back_window_in_mins * self.yy_1_sum[symbol],
+                    self.y_1_sum[symbol],
+                )
 
             ys = np.asarray(self.coin_closes[symbol], dtype=float)
             xs = np.asarray(self.coin_closes["BTCUSDT"], dtype=float)
@@ -459,20 +549,20 @@ class Strategy(qoc.PersistableMixin):
             coef_records[symbol] = {
                 "Close": price,
                 "beta": beta,
-                'beta_adj': (
+                "beta_adj": (
                     beta
-                    * np.array(self.coin_closes['BTCUSDT'])[-1]
+                    * np.array(self.coin_closes["BTCUSDT"])[-1]
                     / np.array(self.coin_closes[symbol])[-1]
                     if np.array(self.coin_closes[symbol])[-1] != 0
                     else 0
-                ), 
-                'corr': corr,
-                'residual': (
-                    residual / beta / np.array(self.coin_closes['BTCUSDT'])[-1]
+                ),
+                "corr": corr,
+                "residual": (
+                    residual / beta / np.array(self.coin_closes["BTCUSDT"])[-1]
                     if beta != 0
                     else 0
                 ),
-                'residual_z': residual_z
+                "residual_z": residual_z,
             }
 
         coef_df = pd.DataFrame.from_dict(coef_records, orient="index")  # index=coin
@@ -487,55 +577,79 @@ class Strategy(qoc.PersistableMixin):
         beta_l = coef_records[l_coin]["beta"]
         beta_s = coef_records[s_coin]["beta"]
 
-        
-        residual_diff = float(coef_df.loc[l_coin, 'residual']) - float(coef_df.loc[s_coin, 'residual'])
-        residual_mean = coef_df['residual'].mean()
-        residual_std = coef_df['residual'].std()
-        residual_z_all = coef_df['residual_z'].mean()
-        residual_z_selected = (float(coef_df.loc[l_coin, 'residual_z']) + float(coef_df.loc[s_coin, 'residual_z'])) / 2
-        residual_sign = np.abs((coef_df['residual'] > 0).sum()-0.5*len(coef_df))
-        corr_all = coef_df['corr'].mean()
-        corr_selected = (float(coef_df.loc[l_coin, 'corr']) + float(coef_df.loc[s_coin, 'corr'])) / 2
-        coef_adj_all = coef_df['beta_adj'].mean()
-        coef_adj_selected = (float(coef_df.loc[l_coin, 'beta_adj']) + float(coef_df.loc[s_coin, 'beta_adj'])) / 2
+        residual_diff = float(coef_df.loc[l_coin, "residual"]) - float(
+            coef_df.loc[s_coin, "residual"]
+        )
+        residual_mean = coef_df["residual"].mean()
+        residual_std = coef_df["residual"].std()
+        residual_z_all = coef_df["residual_z"].mean()
+        residual_z_selected = (
+            float(coef_df.loc[l_coin, "residual_z"])
+            + float(coef_df.loc[s_coin, "residual_z"])
+        ) / 2
+        residual_sign = np.abs((coef_df["residual"] > 0).sum() - 0.5 * len(coef_df))
+        corr_all = coef_df["corr"].mean()
+        corr_selected = (
+            float(coef_df.loc[l_coin, "corr"]) + float(coef_df.loc[s_coin, "corr"])
+        ) / 2
+        coef_adj_all = coef_df["beta_adj"].mean()
+        coef_adj_selected = (
+            float(coef_df.loc[l_coin, "beta_adj"])
+            + float(coef_df.loc[s_coin, "beta_adj"])
+        ) / 2
 
         q_l = self.bullet_size / 2 / price_l_now
-        q_s = self.bullet_size / 2 / price_s_now 
-
+        q_s = self.bullet_size / 2 / price_s_now
 
         # engineer features for model prediction
         latest_paras = {}
-        latest_paras.update({
-            'residual_diff': residual_diff,
-            'residual_std': residual_std,
-            'residual_mean': residual_mean,
-            'residual_z_all': residual_z_all,
-            'residual_z_selected': residual_z_selected,
-            'residual_sign': residual_sign,
-            'corr_all': corr_all,
-            'corr_selected': corr_selected,
-            'coef_adj_all': coef_adj_all,
-            'coef_adj_selected': coef_adj_selected,
-        })
+        latest_paras.update(
+            {
+                "residual_diff": residual_diff,
+                "residual_std": residual_std,
+                "residual_mean": residual_mean,
+                "residual_z_all": residual_z_all,
+                "residual_z_selected": residual_z_selected,
+                "residual_sign": residual_sign,
+                "corr_all": corr_all,
+                "corr_selected": corr_selected,
+                "coef_adj_all": coef_adj_all,
+                "coef_adj_selected": coef_adj_selected,
+            }
+        )
         for w in self.windows:
             for stat in self.stats_list:
- 
-                if stat=='close_ret':
-                    latest_paras[f"{stat}_selected_w{w}"] = (self.close_ret[l_coin][w] + self.close_ret[s_coin][w]) / 2
-                    latest_paras[f"{stat}_all_w{w}"] = np.mean([self.close_ret[symbol][w] for symbol in self.symbols])
-                elif stat=='cmi':
-                    latest_paras[f"{stat}_selected_w{w}"] = (self.cmi[l_coin][w] + self.cmi[s_coin][w]) / 2
-                    latest_paras[f"{stat}_all_w{w}"] = np.mean([self.cmi[symbol][w] for symbol in self.symbols])
-                elif stat=='atr':
-                    latest_paras[f"{stat}_selected_w{w}"] = (self.atr[l_coin][w] + self.atr[s_coin][w]) / 2
-                    latest_paras[f"{stat}_all_w{w}"] = np.mean([self.atr[symbol][w] for symbol in self.symbols])
-                elif stat=='std':
-                    latest_paras[f"{stat}_selected_w{w}"] = (self.std[l_coin][w] + self.std[s_coin][w]) / 2
-                    latest_paras[f"{stat}_all_w{w}"] = np.mean([self.std[symbol][w] for symbol in self.symbols])
-                else: 
+                if stat == "close_ret":
+                    latest_paras[f"{stat}_selected_w{w}"] = (
+                        self.close_ret[l_coin][w] + self.close_ret[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_all_w{w}"] = np.mean(
+                        [self.close_ret[symbol][w] for symbol in self.symbols]
+                    )
+                elif stat == "cmi":
+                    latest_paras[f"{stat}_selected_w{w}"] = (
+                        self.cmi[l_coin][w] + self.cmi[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_all_w{w}"] = np.mean(
+                        [self.cmi[symbol][w] for symbol in self.symbols]
+                    )
+                elif stat == "atr":
+                    latest_paras[f"{stat}_selected_w{w}"] = (
+                        self.atr[l_coin][w] + self.atr[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_all_w{w}"] = np.mean(
+                        [self.atr[symbol][w] for symbol in self.symbols]
+                    )
+                elif stat == "std":
+                    latest_paras[f"{stat}_selected_w{w}"] = (
+                        self.std[l_coin][w] + self.std[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_all_w{w}"] = np.mean(
+                        [self.std[symbol][w] for symbol in self.symbols]
+                    )
+                else:
                     latest_paras[f"{stat}_selected_w{w}"] = 0
                     latest_paras[f"{stat}_all_w{w}"] = 0
-
 
         paras_df = pd.DataFrame([latest_paras])
         paras_rerank = paras_df[self.feature_order]
@@ -543,7 +657,13 @@ class Strategy(qoc.PersistableMixin):
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
 
-        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders) < self.max_concurrent_orders and self.freeze == 0:
+        if (
+            q_l > 0
+            and q_s > 0
+            and self.y_pred > 15
+            and len(self.orders) < self.max_concurrent_orders
+            and self.freeze == 0
+        ):
             self.count += 1
             # long
             response_l: OrderResponse = self.api.order_market(
@@ -598,9 +718,9 @@ class Strategy(qoc.PersistableMixin):
             price_l_his = order.price_l
             price_s_his = order.price_s
 
-            order_profit = -(price_s_now - price_s_his) * float(
-                order.quantity_s
-            ) + (price_l_now - price_l_his) * float(order.quantity_l)
+            order_profit = -(price_s_now - price_s_his) * float(order.quantity_s) + (
+                price_l_now - price_l_his
+            ) * float(order.quantity_l)
 
             if order_profit / self.bullet_size <= -self.stop_loss:
                 self.freeze = 1
@@ -673,7 +793,12 @@ class Strategy(qoc.PersistableMixin):
         self.temps.append(self.y_pred)
 
         if self.t % 60 == 0:
-            logger.info("Logging stats at step %d: count: %d: temp: %f", step, self.count, self.y_pred)
+            logger.info(
+                "Logging stats at step %d: count: %d: temp: %f",
+                step,
+                self.count,
+                self.y_pred,
+            )
             import matplotlib.pyplot as plt
 
             # Create figure with 2 subplots
@@ -708,7 +833,6 @@ class Strategy(qoc.PersistableMixin):
             plt.savefig("examples/stat_arbi-usds/temp_values.png")
             plt.close()
 
-
         # cherries.log_metrics(
         #     {
         #         "assets": asset_metrics,
@@ -723,12 +847,12 @@ class Strategy(qoc.PersistableMixin):
 
 
 class Config(cherries.BaseConfig):
-    online: bool = False
+    online: bool = env.bool("ONLINE", default=False)
 
 
 def main(cfg: Config) -> None:
-    # cherries.log_param("group_key", "Trend USDS 2026-01-06 ETH")
-    # qoc.logging.init()
+    cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
+    qoc.logging.init()
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("1m"))
@@ -737,7 +861,7 @@ def main(cfg: Config) -> None:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2026-01-10", end="2026-02-07"))
         qoc.set_clock(qoc.ClockOffline("1m", start="2026-02-11", end="2026-02-22"))
         api = ApiUsdsOffline()
-        
+
     strategy = Strategy(api=api)
     strategy.init()
     strategy.load_state()
@@ -752,8 +876,8 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    # cherries.main(main)
-    main(Config())
+    cherries.main(main)
+    # main(Config())
 
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/stat_arbi-usds/main_rdft.py
