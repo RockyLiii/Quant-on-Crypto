@@ -110,7 +110,7 @@ class Strategy(qoc.PersistableMixin):
     )
 
     windows_ratio = [0.25, 0.5 , 1, 4, 16, 64, 256]
-    preload_window: int = 30720
+    preload_window: int = 30#720
 
     forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=30))
 
@@ -121,10 +121,10 @@ class Strategy(qoc.PersistableMixin):
     bullet_size: float = 100
     max_concurrent_orders: int = 2
 
-    stop_loss: float = 0.02  
-    take_profit: float = 0.10
+    stop_loss: float = 0.04  
+    take_profit: float = 0.04
 
-    freeze_window: int = 60  # in minutes
+    freeze_window: int = 30  # in minutes
 
 
     # --------------------------------- State -------------------------------- #
@@ -543,7 +543,7 @@ class Strategy(qoc.PersistableMixin):
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
 
-        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders) < self.max_concurrent_orders:
+        if q_l > 0 and q_s > 0 and self.y_pred > 15 and len(self.orders) < self.max_concurrent_orders and self.freeze == 0:
             self.count += 1
             # long
             response_l: OrderResponse = self.api.order_market(
@@ -558,7 +558,7 @@ class Strategy(qoc.PersistableMixin):
                 q_l - float(abs(response_l.orig_qty))
             ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
 
-            # logger.warning("Placed BUY order: %s", response)
+            # logger.warning("Placed BUY order: %s", response_l)
             self.orders.append(
                 Order(
                     price_l=price_l_now,
@@ -605,6 +605,22 @@ class Strategy(qoc.PersistableMixin):
             if order_profit / self.bullet_size <= -self.stop_loss:
                 self.freeze = 1
 
+            logger.warning(
+                "Evaluating order: %s, profit: %f, price_l_now: %f, price_s_now: %f, price_l_his: %f, price_s_his: %f, quantity_l: %f, quantity_s: %f, coin_l: %s, coin_s: %s, time_l: %s, time_s: %s",
+                order,
+                order_profit,
+                price_l_now,
+                price_s_now,
+                price_l_his,
+                price_s_his,
+                float(order.quantity_l),
+                float(order.quantity_s),
+                order.symbol_l,
+                order.symbol_s,
+                order.time_l,
+                order.time_s,
+            )
+
             if (
                 (
                     order.time_l + self.forward_window < now
@@ -617,13 +633,13 @@ class Strategy(qoc.PersistableMixin):
                 response_l = self.api.order_market(
                     order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
                 )
-                # logger.warning("Closed LONG order: %s", response)
+                logger.warning("Closed LONG order: %s", response_l)
 
                 # Close short position
                 response_s = self.api.order_market(
                     order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
                 )
-                # logger.warning("Closed SHORT order: %s", response)
+                logger.warning("Closed SHORT order: %s", response_s)
 
                 self.orders.remove(order)
 
