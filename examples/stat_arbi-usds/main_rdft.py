@@ -110,7 +110,7 @@ class Strategy(qoc.PersistableMixin):
     )
 
     windows_ratio = [0.25, 0.5 , 1, 4, 16, 64, 256]
-    preload_window: int = 30#720
+    preload_window: int = 30720
 
     forward_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=30))
 
