@@ -833,17 +833,17 @@ class Strategy(qoc.PersistableMixin):
             plt.savefig("examples/stat_arbi-usds/temp_values.png")
             plt.close()
 
-        # cherries.log_metrics(
-        #     {
-        #         "assets": asset_metrics,
-        #         "open_orders": len(self.orders["ETHUSDT"]),
-        #         "price": self.api.ticker_price("ETHUSDT").price,
-        #         "time": now.timestamp(),
-        #         # "stats": stats,
-        #         # "positions": position_metrics,
-        #     },
-        #     step=step,
-        # )
+        cherries.log_metrics(
+            {
+                "assets": asset_metrics,
+                # "open_orders": len(self.orders["ETHUSDT"]),
+                # "price": self.api.ticker_price("ETHUSDT").price,
+                "time": now.timestamp(),
+                # "stats": stats,
+                "positions": position_metrics,
+            },
+            step=step,
+        )
 
 
 class Config(cherries.BaseConfig):
