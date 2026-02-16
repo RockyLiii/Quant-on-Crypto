@@ -383,7 +383,7 @@ def main(cfg: Config) -> None:
         qoc.set_clock(qoc.ClockOnline("1m"))
         api = ApiUsdsOnline()
     else:
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-01-01", end="2025-12-21"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-25", end="2026-12-21"))
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
@@ -404,3 +404,5 @@ if __name__ == "__main__":
 
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main_doge.py
+
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python deploy/trend/main_doge.py

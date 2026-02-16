@@ -12,6 +12,7 @@ import polars as pl
 from environs import env
 from liblaf import cherries
 from pendulum import DateTime, Duration
+from collections import deque
 
 import qoc
 import qoc.logging
@@ -33,6 +34,49 @@ class Order:
     quantity_s: Decimal
     symbol_s: SymbolName
     time_s: DateTime
+
+class RollingMax:
+    def __init__(self, window: int):
+        self.window = window
+        self.deque = deque()   # (value, index)
+        self.index = -1
+
+    def update(self, value: float) -> float:
+        self.index += 1
+
+        # 删除比当前小的
+        while self.deque and self.deque[-1][0] <= value:
+            self.deque.pop()
+
+        self.deque.append((value, self.index))
+
+        # 删除窗口外
+        while self.deque and self.deque[0][1] <= self.index - self.window:
+            self.deque.popleft()
+
+        return self.deque[0][0]
+
+
+class RollingMin:
+    def __init__(self, window: int):
+        self.window = window
+        self.deque = deque()
+        self.index = -1
+
+    def update(self, value: float) -> float:
+        self.index += 1
+
+        # 删除比当前大的
+        while self.deque and self.deque[-1][0] >= value:
+            self.deque.pop()
+
+        self.deque.append((value, self.index))
+
+        # 删除窗口外
+        while self.deque and self.deque[0][1] <= self.index - self.window:
+            self.deque.popleft()
+
+        return self.deque[0][0]
 
 
 @attrs.define
@@ -110,7 +154,7 @@ class Strategy(qoc.PersistableMixin):
     )
 
     windows_ratio = [0.25, 0.5, 1, 4, 16, 64, 256]
-    preload_window: int = 30720
+    preload_window: int = 30
 
     forward_window: Duration = attrs.field(
         factory=lambda: pendulum.duration(minutes=30)
@@ -293,17 +337,25 @@ class Strategy(qoc.PersistableMixin):
 
             self.closes[symbol][w].append(self.coin_closes[symbol][-1])
 
-            # states
-            self.log_close_tail_minus_head[symbol][w] = (
-                self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
-            )
-            self.tr_sum[symbol][w] = sum(self.tr[symbol][w])
-            self.highs_max[symbol][w] = max(self.highs[symbol][w])
-            self.lows_min[symbol][w] = min(self.lows[symbol][w])
-            self.log_close_diff_sum[symbol][w] = sum(self.log_close_diff[symbol][w])
-            self.log_close_diff_sqr_sum[symbol][w] = sum(
-                self.log_close_diff_sqr[symbol][w]
-            )
+            # states 
+            self.log_close_tail_minus_head[symbol][w] = self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
+            # self.tr_sum[symbol][w] = sum(self.tr[symbol][w])    
+            self.tr_sum[symbol][w] += self.tr[symbol][w][-1] - (self.tr[symbol][w][0] if len(self.tr[symbol][w]) >= w else 0)
+
+            # [optmz]
+            # self.highs_max[symbol][w] = max(self.highs[symbol][w])
+            # self.lows_min[symbol][w] = min(self.lows[symbol][w])
+
+            self.highs_max[symbol][w] = \
+                self.rolling_max[symbol][w].update(high)
+
+            self.lows_min[symbol][w] = \
+                self.rolling_min[symbol][w].update(low)
+                    
+            
+            self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (self.log_close_diff[symbol][w][0] if len(self.log_close_diff[symbol][w]) >= w else 0)
+            self.log_close_diff_sqr_sum[symbol][w] += self.log_close_diff_sqr[symbol][w][-1] - (self.log_close_diff_sqr[symbol][w][0] if len(self.log_close_diff_sqr[symbol][w]) >= w else 0)
+
 
             # features
             self.close_ret[symbol][w] = (
@@ -376,6 +428,29 @@ class Strategy(qoc.PersistableMixin):
                 feature[symbol] = {}
                 for w in self.windows:
                     feature[symbol][w] = 0.0
+
+
+        # 每个 symbol 单独一套
+        self.rolling_max = {}
+        self.rolling_min = {}
+
+        self.highs_max = {}
+        self.lows_min = {}
+
+        for symbol in self.symbols:
+
+            self.rolling_max[symbol] = {}
+            self.rolling_min[symbol] = {}
+
+            self.highs_max[symbol] = {}
+            self.lows_min[symbol] = {}
+
+            for w in self.windows:
+                self.rolling_max[symbol][w] = RollingMax(w)
+                self.rolling_min[symbol][w] = RollingMin(w)
+
+                self.highs_max[symbol][w] = 0.0
+                self.lows_min[symbol][w] = 0.0
 
         # import model
         self.model_trained = pickle.load(
@@ -544,7 +619,7 @@ class Strategy(qoc.PersistableMixin):
             ys = np.asarray(self.coin_closes[symbol], dtype=float)
             xs = np.asarray(self.coin_closes["BTCUSDT"], dtype=float)
             residuals = ys - beta * xs
-            residual_z = np.sum(residuals < xs[-1]) + 1
+            residual_z = np.sum(residuals < residuals[-1]) + 1
 
             coef_records[symbol] = {
                 "Close": price,

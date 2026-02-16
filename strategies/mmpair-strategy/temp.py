@@ -1,75 +1,122 @@
-coef_records = {}
+Feature importance (sorted by importance):
+  std_selected_w30: 0.0915
+  residual_diff: 0.0892
+  cmi_selected_w30720: 0.0827
+  std_selected_w60: 0.0625
+  close_ret_all_w1920: 0.0538
+  cmi_all_w1920: 0.0473
+  std_all_w30720: 0.0453
+  std_all_w30: 0.0398
+  cmi_all_w30720: 0.0358
+  cmi_all_w7680: 0.0333
+  std_all_w480: 0.0266
+  close_ret_selected_w60: 0.0236
+  std_all_w1920: 0.0222
+  close_ret_selected_w480: 0.0214
+  cmi_all_w480: 0.0169
+  cmi_selected_w7680: 0.0157
+  close_ret_all_w30720: 0.0154
+  cmi_selected_w1920: 0.0152
+  close_ret_selected_w120: 0.0147
+  std_all_w60: 0.0130
+  close_ret_all_w480: 0.0128
+  std_all_w7680: 0.0126
+  atr_all_w30720: 0.0124
+  close_ret_all_w7680: 0.0123
+  atr_all_w480: 0.0119
+  std_selected_w120: 0.0115
+  residual_std: 0.0114
+  coef_adj_selected: 0.0113
+  close_ret_selected_w7680: 0.0113
+  atr_all_w1920: 0.0096
+  atr_all_w120: 0.0087
+  atr_all_w7680: 0.0074
+  atr_all_w60: 0.0070
+  close_ret_selected_w1920: 0.0070
+  atr_selected_w7680: 0.0067
+  atr_selected_w60: 0.0058
+  std_all_w120: 0.0057
+  cmi_all_w60: 0.0052
+  std_selected_w7680: 0.0045
+  atr_selected_w1920: 0.0043
+  std_selected_w480: 0.0041
+  std_selected_w1920: 0.0041
+  atr_all_w30: 0.0036
+  cmi_selected_w480: 0.0034
+  cmi_selected_w60: 0.0031
+  std_selected_w30720: 0.0030
+  close_ret_selected_w30720: 0.0030
+  corr_selected: 0.0029
+  cmi_all_w120: 0.0027
+  corr_all: 0.0027
+  atr_selected_w30720: 0.0026
+  atr_selected_w120: 0.0021
+  cmi_selected_w120: 0.0021
+  atr_selected_w30: 0.0020
+  cmi_all_w30: 0.0019
+  close_ret_all_w60: 0.0019
+  cmi_selected_w30: 0.0014
+  close_ret_all_w120: 0.0014
+  close_ret_all_w30: 0.0013
+  residual_z_all: 0.0012
+  atr_selected_w480: 0.0010
+  close_ret_selected_w30: 0.0009
+  residual_mean: 0.0008
+  residual_sign: 0.0006
+  coef_adj_all: 0.0006
+  residual_z_selected: 0.0004
+  amihud_all_w30: 0.0000
+  amihud_all_w60: 0.0000
+  amihud_all_w120: 0.0000
+  amihud_all_w480: 0.0000
+  amihud_all_w1920: 0.0000
+  amihud_all_w7680: 0.0000
+  amihud_all_w30720: 0.0000
+  amihud_selected_w30: 0.0000
+  amihud_selected_w60: 0.0000
+  amihud_selected_w120: 0.0000
+  amihud_selected_w480: 0.0000
+  amihud_selected_w1920: 0.0000
+  amihud_selected_w7680: 0.0000
+  amihud_selected_w30720: 0.0000
+  coin_all_w30: 0.0000
+  coin_all_w60: 0.0000
+  coin_all_w120: 0.0000
+  coin_all_w480: 0.0000
+  coin_all_w1920: 0.0000
+  coin_all_w7680: 0.0000
+  coin_all_w30720: 0.0000
+  coin_selected_w30: 0.0000
+  coin_selected_w60: 0.0000
+  coin_selected_w120: 0.0000
+  coin_selected_w480: 0.0000
+  coin_selected_w1920: 0.0000
+  coin_selected_w7680: 0.0000
+  coin_selected_w30720: 0.0000
+  bb_all_w30: 0.0000
+  bb_all_w60: 0.0000
+  bb_all_w120: 0.0000
+  bb_all_w480: 0.0000
+  bb_all_w1920: 0.0000
+  bb_all_w7680: 0.0000
+  bb_all_w30720: 0.0000
+  bb_selected_w30: 0.0000
+  bb_selected_w60: 0.0000
+  bb_selected_w120: 0.0000
+  bb_selected_w480: 0.0000
+  bb_selected_w1920: 0.0000
+  bb_selected_w7680: 0.0000
+  bb_selected_w30720: 0.0000
 
-revenues = []
-
-
-windows = [1, 2, 4, 8, 16, 32, 64, 128, 256]
-for i in range(len(windows)):
-    windows[i] *= BACK_WINDOW
-
-
-# regression stats
-# Residual difference between short and long
-# Residual mean/std
-
-# Residual z-score all
-# Residual z-score selected
-# Residual sign
-
-# corr all
-# corr selected
-
-# coef adjusted mean/std
-
-stats_global = {
-    "residual_diff": [],  #
-    "residual_std": [],  #
-    "residual_mean": [],  #
-    "residual_z_all": [],
-    "residual_z_selected": [],
-    "residual_sign": [],
-    "corr_all": [],
-    "corr_selected": [],
-}
-
-
-# stats by windows
-# growth diff all
-# growth diff selected
-# growth diff sign
-
-# Amihud all
-# Amihud selected
-
-# CMI all
-# CMI selected
-
-# coin score all
-# coin score selected
-
-# ATR all
-# ATR selected
-
-# Bollinger Bands all
-# Bollinger Bands selected
-
-# Volatility all
-# Volatility selected
-
-stats_by_window = {
-    "growth_diff_all": {w: [] for w in windows},
-    "growth_diff_selected": {w: [] for w in windows},
-    "growth_diff_sign": {w: [] for w in windows},
-    "amihud_all": {w: [] for w in windows},
-    "amihud_selected": {w: [] for w in windows},
-    "cmi_all": {w: [] for w in windows},
-    "cmi_selected": {w: [] for w in windows},
-    "coin_all": {w: [] for w in windows},
-    "coin_selected": {w: [] for w in windows},
-    "atr_all": {w: [] for w in windows},
-    "atr_selected": {w: [] for w in windows},
-    "bb_all": {w: [] for w in windows},
-    "bb_selected": {w: [] for w in windows},
-    "vol_all": {w: [] for w in windows},
-    "vol_selected": {w: [] for w in windows},
-}
+Top 10 most important features:
+            feature  importance
+   std_selected_w30    0.091526
+      residual_diff    0.089156
+cmi_selected_w30720    0.082717
+   std_selected_w60    0.062486
+close_ret_all_w1920    0.053760
+      cmi_all_w1920    0.047336
+     std_all_w30720    0.045277
+        std_all_w30    0.039762
+     cmi_all_w30720    0.035847
+      cmi_all_w7680    0.033261

@@ -357,7 +357,7 @@ def main(cfg: Config) -> None:
         qoc.set_clock(qoc.ClockOnline(interval="5m"))
     else:
         qoc.set_clock(
-            qoc.ClockOffline(interval="5m", start="2025-10-01", end="2025-10-15")
+            qoc.ClockOffline(interval="5m", start="2025-10-25", end="2026-02-15")
         )
     api: qoc.Api = qoc.ApiBinanceSpot() if cfg.online else qoc.ApiOfflineSpot()
     strategy = StrategyTrend()
@@ -381,4 +381,4 @@ def main(cfg: Config) -> None:
 if __name__ == "__main__":
     main(cfg=Config())
 
-# BINANCE_BASE_URL='https://api.binance.us' python /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/trend/main.py
+# BINANCE_BASE_URL='https://api.binance.us' ./.venv/bin/python examples/trend-usds/main.py     /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/trend/main.py

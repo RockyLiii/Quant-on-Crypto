@@ -371,11 +371,11 @@ class Strategy(qoc.PersistableMixin):
 
 
 class Config(cherries.BaseConfig):
-    online: bool = True
+    online: bool = False
 
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "Trend USDS 2026-01-06 ETH")
+    # cherries.log_param("group_key", "Trend USDS 2026-01-06 ETH")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
@@ -383,7 +383,7 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOnline()
     else:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-01", end="2026-01-03"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-11-25", end="2026-02-09"))
 
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
@@ -400,7 +400,8 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    cherries.main(main)
-    # main(Config())
+    # cherries.main(main)
+    main(Config())
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main.py
+
