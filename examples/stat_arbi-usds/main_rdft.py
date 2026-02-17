@@ -583,6 +583,8 @@ class Strategy(qoc.PersistableMixin):
 
     def step(self) -> None:
         now: DateTime = qoc.now()
+        self.data_logger.step(now)
+        self.data_logger.append("t", self.t)
 
         klines: pl.DataFrame = self.api.klines("BTCUSDT", "1m", end_time=now, limit=2)
 
@@ -970,7 +972,7 @@ class Strategy(qoc.PersistableMixin):
         #     plt.close()
 
         if self.t % 10 == 0:
-            self.data_logger.to_polars()
+            self.data_logger.dump()
 
         cherries.log_metrics(
             {
