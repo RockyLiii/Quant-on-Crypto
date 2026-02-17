@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import collections
 import logging
 import pickle
 from collections import deque
 from decimal import Decimal
+from pathlib import Path
+from typing import Any
 
 import attrs
 import numpy as np
@@ -12,15 +16,33 @@ import polars as pl
 from environs import env
 from liblaf import cherries
 from pendulum import DateTime, Duration
-from collections import deque
 
 import qoc
 import qoc.logging
 from qoc.api.usds import ApiUsds, ApiUsdsOffline, ApiUsdsOnline
-from qoc.api.usds.models import Account, MarginType, OrderResponse, OrderSide
+from qoc.api.usds.models import Account, MarginType
 from qoc.typing import SymbolName
 
 logger = logging.getLogger(__name__)
+
+
+class DataLogger(collections.UserDict[str, list[Any]]):
+    def append(self, key: str, value: Any) -> None:
+        if key not in self.data:
+            self.data[key] = []
+        self.data[key].append(value)
+
+    def dump(self, filename: str | Path | None = None) -> None:
+        df: pl.DataFrame = self.to_polars()
+        if filename is None:
+            filename = qoc.entrypoint().parent / "data_log.csv"
+        df.write_csv(filename)
+
+    def step(self, time: DateTime) -> None:
+        self.append("time", time)
+
+    def to_polars(self) -> pl.DataFrame:
+        return pl.from_dict(self.data)
 
 
 @attrs.frozen
@@ -35,10 +57,11 @@ class Order:
     symbol_s: SymbolName
     time_s: DateTime
 
+
 class RollingMax:
     def __init__(self, window: int):
         self.window = window
-        self.deque = deque()   # (value, index)
+        self.deque = deque()  # (value, index)
         self.index = -1
 
     def update(self, value: float) -> float:
@@ -265,6 +288,8 @@ class Strategy(qoc.PersistableMixin):
 
     freeze: int = 0
 
+    data_logger: DataLogger = attrs.field(factory=DataLogger)
+
     def update_indicators(
         self,
         symbol: str,
@@ -337,25 +362,35 @@ class Strategy(qoc.PersistableMixin):
 
             self.closes[symbol][w].append(self.coin_closes[symbol][-1])
 
-            # states 
-            self.log_close_tail_minus_head[symbol][w] = self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
-            # self.tr_sum[symbol][w] = sum(self.tr[symbol][w])    
-            self.tr_sum[symbol][w] += self.tr[symbol][w][-1] - (self.tr[symbol][w][0] if len(self.tr[symbol][w]) >= w else 0)
+            # states
+            self.log_close_tail_minus_head[symbol][w] = (
+                self.log_close[symbol][w][-1] - self.log_close[symbol][w][0]
+            )
+            # self.tr_sum[symbol][w] = sum(self.tr[symbol][w])
+            self.tr_sum[symbol][w] += self.tr[symbol][w][-1] - (
+                self.tr[symbol][w][0] if len(self.tr[symbol][w]) >= w else 0
+            )
 
             # [optmz]
             # self.highs_max[symbol][w] = max(self.highs[symbol][w])
             # self.lows_min[symbol][w] = min(self.lows[symbol][w])
 
-            self.highs_max[symbol][w] = \
-                self.rolling_max[symbol][w].update(high)
+            self.highs_max[symbol][w] = self.rolling_max[symbol][w].update(high)
 
-            self.lows_min[symbol][w] = \
-                self.rolling_min[symbol][w].update(low)
-                    
-            
-            self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (self.log_close_diff[symbol][w][0] if len(self.log_close_diff[symbol][w]) >= w else 0)
-            self.log_close_diff_sqr_sum[symbol][w] += self.log_close_diff_sqr[symbol][w][-1] - (self.log_close_diff_sqr[symbol][w][0] if len(self.log_close_diff_sqr[symbol][w]) >= w else 0)
+            self.lows_min[symbol][w] = self.rolling_min[symbol][w].update(low)
 
+            self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (
+                self.log_close_diff[symbol][w][0]
+                if len(self.log_close_diff[symbol][w]) >= w
+                else 0
+            )
+            self.log_close_diff_sqr_sum[symbol][w] += self.log_close_diff_sqr[symbol][
+                w
+            ][-1] - (
+                self.log_close_diff_sqr[symbol][w][0]
+                if len(self.log_close_diff_sqr[symbol][w]) >= w
+                else 0
+            )
 
             # features
             self.close_ret[symbol][w] = (
@@ -429,7 +464,6 @@ class Strategy(qoc.PersistableMixin):
                 for w in self.windows:
                     feature[symbol][w] = 0.0
 
-
         # 每个 symbol 单独一套
         self.rolling_max = {}
         self.rolling_min = {}
@@ -438,7 +472,6 @@ class Strategy(qoc.PersistableMixin):
         self.lows_min = {}
 
         for symbol in self.symbols:
-
             self.rolling_max[symbol] = {}
             self.rolling_min[symbol] = {}
 
@@ -554,7 +587,9 @@ class Strategy(qoc.PersistableMixin):
         klines: pl.DataFrame = self.api.klines("BTCUSDT", "1m", end_time=now, limit=2)
 
         btc_price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
+        self.data_logger.append("btc_price", btc_price)
         btc_volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
+        self.data_logger.append("btc_volume", btc_volume)
 
         coef_records = {}
 
@@ -562,16 +597,22 @@ class Strategy(qoc.PersistableMixin):
             orders = self.orders
             klines: pl.DataFrame = self.api.klines(symbol, "1m", end_time=now, limit=2)
             price: float = klines["close"].last()  # pyright: ignore[reportAssignmentType]
+            # self.data_logger.append(f"{symbol}_price", price)
             volume: float = klines["volume"].last()  # pyright: ignore[reportAssignmentType]
+            # self.data_logger.append(f"{symbol}_volume", volume)
             high: float = klines["high"].last()  # pyright: ignore[reportAssignmentType]
+            # self.data_logger.append(f"{symbol}_high", high)
             low: float = klines["low"].last()  # pyright: ignore[reportAssignmentType]
+            # self.data_logger.append(f"{symbol}_low", low)
             self.update_indicators(
                 symbol, price, volume, btc_price, btc_volume, high, low
             )
 
             beta = self.xy_1_sum[symbol] / self.xx_1_sum[symbol]
+            # self.data_logger.append(f"{symbol}_beta", beta)
 
             residual = price - (beta * btc_price)
+            # self.data_logger.append(f"{symbol}_residual", residual)
 
             corr = (
                 (
@@ -599,6 +640,7 @@ class Strategy(qoc.PersistableMixin):
                 != 0
                 else 0
             )
+            # self.data_logger.append(f"{symbol}_corr", corr)
             # debug
             if (
                 self.back_window_in_mins * self.xx_1_sum[symbol]
@@ -639,6 +681,8 @@ class Strategy(qoc.PersistableMixin):
                 ),
                 "residual_z": residual_z,
             }
+            for k, v in coef_records[symbol].items():
+                self.data_logger.append(f"{symbol}_{k}", v)
 
         coef_df = pd.DataFrame.from_dict(coef_records, orient="index")  # index=coin
 
@@ -675,6 +719,22 @@ class Strategy(qoc.PersistableMixin):
 
         q_l = self.bullet_size / 2 / price_l_now
         q_s = self.bullet_size / 2 / price_s_now
+        self.data_logger.append("l_coin", l_coin)
+        self.data_logger.append("s_coin", s_coin)
+        self.data_logger.append("price_l_now", price_l_now)
+        self.data_logger.append("price_s_now", price_s_now)
+        self.data_logger.append("beta_l", beta_l)
+        self.data_logger.append("beta_s", beta_s)
+        self.data_logger.append("residual_diff", residual_diff)
+        self.data_logger.append("residual_mean", residual_mean)
+        self.data_logger.append("residual_std", residual_std)
+        self.data_logger.append("residual_z_all", residual_z_all)
+        self.data_logger.append("residual_z_selected", residual_z_selected)
+        self.data_logger.append("residual_sign", residual_sign)
+        self.data_logger.append("corr_all", corr_all)
+        self.data_logger.append("corr_selected", corr_selected)
+        self.data_logger.append("coef_adj_all", coef_adj_all)
+        self.data_logger.append("coef_adj_selected", coef_adj_selected)
 
         # engineer features for model prediction
         latest_paras = {}
@@ -731,6 +791,7 @@ class Strategy(qoc.PersistableMixin):
         for col in self.feature_order:
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
+        self.data_logger.append("y_pred", self.y_pred)
 
         if (
             q_l > 0
@@ -741,31 +802,31 @@ class Strategy(qoc.PersistableMixin):
         ):
             self.count += 1
             # long
-            response_l: OrderResponse = self.api.order_market(
-                l_coin, OrderSide.BUY, quantity=q_l
-            )
-            # short
-            response_s: OrderResponse = self.api.order_market(
-                s_coin, OrderSide.SELL, quantity=q_s
-            )
+            # response_l: OrderResponse = self.api.order_market(
+            #     l_coin, OrderSide.BUY, quantity=q_l
+            # )
+            # # short
+            # response_s: OrderResponse = self.api.order_market(
+            #     s_coin, OrderSide.SELL, quantity=q_s
+            # )
 
-            self.temp += price_l_now * (
-                q_l - float(abs(response_l.orig_qty))
-            ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
+            # self.temp += price_l_now * (
+            #     q_l - float(abs(response_l.orig_qty))
+            # ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
 
             # logger.warning("Placed BUY order: %s", response_l)
-            self.orders.append(
-                Order(
-                    price_l=price_l_now,
-                    quantity_l=abs(response_l.orig_qty),
-                    symbol_l=l_coin,
-                    time_l=response_l.update_time,
-                    price_s=price_s_now,
-                    quantity_s=abs(response_s.orig_qty),
-                    symbol_s=s_coin,
-                    time_s=response_s.update_time,
-                )
-            )
+            # self.orders.append(
+            #     Order(
+            #         price_l=price_l_now,
+            #         quantity_l=abs(response_l.orig_qty),
+            #         symbol_l=l_coin,
+            #         time_l=response_l.update_time,
+            #         price_s=price_s_now,
+            #         quantity_s=abs(response_s.orig_qty),
+            #         symbol_s=s_coin,
+            #         time_s=response_s.update_time,
+            #     )
+            # )
 
         orders = self.orders
         orders_to_process = list(orders)
@@ -825,16 +886,16 @@ class Strategy(qoc.PersistableMixin):
                 or order_profit / self.bullet_size >= self.take_profit
             ):
                 # Close long position
-                response_l = self.api.order_market(
-                    order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
-                )
-                logger.warning("Closed LONG order: %s", response_l)
-
+                # response_l = self.api.order_market(
+                #     order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
+                # )
+                # logger.warning("Closed LONG order: %s", response_l)
                 # Close short position
-                response_s = self.api.order_market(
-                    order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
-                )
-                logger.warning("Closed SHORT order: %s", response_s)
+                # response_s = self.api.order_market(
+                #     order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
+                # )
+                # logger.warning("Closed SHORT order: %s", response_s)
+                logger.warning("Closed order: %s, profit: %f", order, order_profit)
 
                 self.orders.remove(order)
 
@@ -867,46 +928,49 @@ class Strategy(qoc.PersistableMixin):
             }
         self.temps.append(self.y_pred)
 
-        if self.t % 60 == 0:
-            logger.info(
-                "Logging stats at step %d: count: %d: temp: %f",
-                step,
-                self.count,
-                self.y_pred,
-            )
-            import matplotlib.pyplot as plt
+        # if self.t % 60 == 0:
+        #     logger.info(
+        #         "Logging stats at step %d: count: %d: temp: %f",
+        #         step,
+        #         self.count,
+        #         self.y_pred,
+        #     )
+        #     import matplotlib.pyplot as plt
 
-            # Create figure with 2 subplots
-            fig, ax = plt.subplots(figsize=(12, 6))
+        #     # Create figure with 2 subplots
+        #     fig, ax = plt.subplots(figsize=(12, 6))
 
-            # ===== First subplot: Asset balance and price =====
-            # Plot asset balance on primary y-axis
-            for asset_name, balance_history in self.asset_history.items():
-                ax.plot(
-                    range(len(balance_history)),
-                    balance_history,
-                    "-",
-                    label=f"{asset_name} Balance",
-                )
-            ax.set_xlabel("Time Steps")
-            ax.set_ylabel("Balance (USDT)", color="tab:blue")
-            ax.tick_params(axis="y", labelcolor="tab:blue")
-            ax.legend()
+        #     # ===== First subplot: Asset balance and price =====
+        #     # Plot asset balance on primary y-axis
+        #     for asset_name, balance_history in self.asset_history.items():
+        #         ax.plot(
+        #             range(len(balance_history)),
+        #             balance_history,
+        #             "-",
+        #             label=f"{asset_name} Balance",
+        #         )
+        #     ax.set_xlabel("Time Steps")
+        #     ax.set_ylabel("Balance (USDT)", color="tab:blue")
+        #     ax.tick_params(axis="y", labelcolor="tab:blue")
+        #     ax.legend()
 
-            plt.savefig("examples/stat_arbi-usds/asset_metrics.png")
-            plt.close()  # 关闭图表释放内存
+        #     plt.savefig("examples/stat_arbi-usds/asset_metrics.png")
+        #     plt.close()  # 关闭图表释放内存
 
-            # plot temps
-            plt.figure(figsize=(10, 5))
-            plt.plot(
-                range(len(self.temps)), self.temps, label="Temp Value", color="orange"
-            )
-            plt.xlabel("Time Steps")
-            plt.ylabel("Temp Value")
-            plt.title("Temp Value Over Time")
-            plt.legend()
-            plt.savefig("examples/stat_arbi-usds/temp_values.png")
-            plt.close()
+        #     # plot temps
+        #     plt.figure(figsize=(10, 5))
+        #     plt.plot(
+        #         range(len(self.temps)), self.temps, label="Temp Value", color="orange"
+        #     )
+        #     plt.xlabel("Time Steps")
+        #     plt.ylabel("Temp Value")
+        #     plt.title("Temp Value Over Time")
+        #     plt.legend()
+        #     plt.savefig("examples/stat_arbi-usds/temp_values.png")
+        #     plt.close()
+
+        if self.t % 10 == 0:
+            self.data_logger.to_polars()
 
         cherries.log_metrics(
             {
@@ -916,6 +980,7 @@ class Strategy(qoc.PersistableMixin):
                 "time": now.timestamp(),
                 # "stats": stats,
                 "positions": position_metrics,
+                "y_pred": self.y_pred,
             },
             step=step,
         )
@@ -942,8 +1007,8 @@ def main(cfg: Config) -> None:
     strategy.load_state()
     for _ in qoc.loop():
         try:
-            strategy.log_stats()
             strategy.step()
+            strategy.log_stats()
             if cfg.online:
                 strategy.dump_state()
         except Exception:
@@ -951,8 +1016,8 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    # cherries.main(main)
-    main(Config())
+    cherries.main(main)
+    # main(Config())
 
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/stat_arbi-usds/main_rdft.py
