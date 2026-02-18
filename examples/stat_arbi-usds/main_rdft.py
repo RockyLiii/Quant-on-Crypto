@@ -1001,7 +1001,13 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOnline()
     else:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2026-01-10", end="2026-02-07"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2026-02-11", end="2026-02-22"))
+        qoc.set_clock(
+            qoc.ClockOffline(
+                "1m",
+                start="2026-02-17T15:39:42.034643+0000",
+                end="2026-02-18T11:10:54.510203+0000",
+            )
+        )
         api = ApiUsdsOffline()
 
     strategy = Strategy(api=api)
