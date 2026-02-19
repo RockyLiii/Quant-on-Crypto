@@ -270,6 +270,9 @@ class Strategy(qoc.PersistableMixin):
     # bb
     closes: dict[str, dict] = attrs.field(factory=dict)
     close_sqr: dict[str, dict] = attrs.field(factory=dict)
+    
+    closes_sum: dict[str, dict] = attrs.field(factory=dict)
+    closes_sqr_sum: dict[str, dict] = attrs.field(factory=dict)
 
     bb: dict[str, dict] = attrs.field(factory=dict)
 
@@ -379,6 +382,9 @@ class Strategy(qoc.PersistableMixin):
 
             self.lows_min[symbol][w] = self.rolling_min[symbol][w].update(low)
 
+            self.closes_sum[symbol][w] += self.closes[symbol][w][-1] - (self.closes[symbol][w][0] if len(self.closes[symbol][w]) >= w else 0)
+            self.close_sqr_sum[symbol][w] += self.close_sqr[symbol][w][-1] - (self.close_sqr[symbol][w][0] if len(self.close_sqr[symbol][w]) >= w else 0)          
+
             self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (
                 self.log_close_diff[symbol][w][0]
                 if len(self.log_close_diff[symbol][w]) >= w
@@ -414,6 +420,9 @@ class Strategy(qoc.PersistableMixin):
             self.atr[symbol][w] = (
                 self.tr_sum[symbol][w] / w if self.tr_sum[symbol][w] != 0 else 0
             )
+
+            self.bb[symbol][w] = (price - self.closes_sum[symbol][w] / w) / (np.sqrt(self.close_sqr_sum[symbol][w] / w - (self.closes_sum[symbol][w] / w)**2)) if self.close_sqr_sum[symbol][w] != 0 else 0
+
 
             self.std[symbol][w] = (
                 np.sqrt(
@@ -451,6 +460,8 @@ class Strategy(qoc.PersistableMixin):
             self.tr_sum,
             self.highs_max,
             self.lows_min,
+            self.closes_sum, 
+            self.close_sqr_sum,
             self.log_close_diff_sum,
             self.log_close_diff_sqr_sum,
         ]:
@@ -708,16 +719,20 @@ class Strategy(qoc.PersistableMixin):
             float(coef_df.loc[l_coin, "residual_z"])
             + float(coef_df.loc[s_coin, "residual_z"])
         ) / 2
+        residual_z_selected_mns = (float(coef_df.loc[l_coin, 'residual_z']) - float(coef_df.loc[s_coin, 'residual_z'])) / 2
+
         residual_sign = np.abs((coef_df["residual"] > 0).sum() - 0.5 * len(coef_df))
         corr_all = coef_df["corr"].mean()
         corr_selected = (
             float(coef_df.loc[l_coin, "corr"]) + float(coef_df.loc[s_coin, "corr"])
         ) / 2
+        corr_selected_mns = (float(coef_df.loc[l_coin, "corr"]) - float(coef_df.loc[s_coin, "corr"])) / 2
         coef_adj_all = coef_df["beta_adj"].mean()
         coef_adj_selected = (
             float(coef_df.loc[l_coin, "beta_adj"])
             + float(coef_df.loc[s_coin, "beta_adj"])
         ) / 2
+        coef_adj_selected_mns = (float(coef_df.loc[l_coin, "beta_adj"]) - float(coef_df.loc[s_coin, "beta_adj"])) / 2
 
         q_l = self.bullet_size / 2 / price_l_now
         q_s = self.bullet_size / 2 / price_s_now
@@ -732,11 +747,14 @@ class Strategy(qoc.PersistableMixin):
         self.data_logger.append("residual_std", residual_std)
         self.data_logger.append("residual_z_all", residual_z_all)
         self.data_logger.append("residual_z_selected", residual_z_selected)
+        self.data_logger.append("residual_z_selected_mns", residual_z_selected_mns)
         self.data_logger.append("residual_sign", residual_sign)
         self.data_logger.append("corr_all", corr_all)
         self.data_logger.append("corr_selected", corr_selected)
+        self.data_logger.append("corr_selected_mns", corr_selected_mns)
         self.data_logger.append("coef_adj_all", coef_adj_all)
         self.data_logger.append("coef_adj_selected", coef_adj_selected)
+        self.data_logger.append("coef_adj_selected_mns", coef_adj_selected_mns)
 
         # engineer features for model prediction
         latest_paras = {}
@@ -747,11 +765,14 @@ class Strategy(qoc.PersistableMixin):
                 "residual_mean": residual_mean,
                 "residual_z_all": residual_z_all,
                 "residual_z_selected": residual_z_selected,
+                "residual_z_selected_mns": residual_z_selected_mns,
                 "residual_sign": residual_sign,
                 "corr_all": corr_all,
                 "corr_selected": corr_selected,
+                "corr_selected_mns": corr_selected_mns,
                 "coef_adj_all": coef_adj_all,
                 "coef_adj_selected": coef_adj_selected,
+                "coef_adj_selected_mns": coef_adj_selected_mns,
             }
         )
         for w in self.windows:
@@ -760,12 +781,18 @@ class Strategy(qoc.PersistableMixin):
                     latest_paras[f"{stat}_selected_w{w}"] = (
                         self.close_ret[l_coin][w] + self.close_ret[s_coin][w]
                     ) / 2
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = (
+                        self.close_ret[l_coin][w] - self.close_ret[s_coin][w]
+                    ) / 2
                     latest_paras[f"{stat}_all_w{w}"] = np.mean(
                         [self.close_ret[symbol][w] for symbol in self.symbols]
                     )
                 elif stat == "cmi":
                     latest_paras[f"{stat}_selected_w{w}"] = (
                         self.cmi[l_coin][w] + self.cmi[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = (
+                        self.cmi[l_coin][w] - self.cmi[s_coin][w]
                     ) / 2
                     latest_paras[f"{stat}_all_w{w}"] = np.mean(
                         [self.cmi[symbol][w] for symbol in self.symbols]
@@ -774,6 +801,9 @@ class Strategy(qoc.PersistableMixin):
                     latest_paras[f"{stat}_selected_w{w}"] = (
                         self.atr[l_coin][w] + self.atr[s_coin][w]
                     ) / 2
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = (
+                        self.atr[l_coin][w] - self.atr[s_coin][w]
+                    ) / 2
                     latest_paras[f"{stat}_all_w{w}"] = np.mean(
                         [self.atr[symbol][w] for symbol in self.symbols]
                     )
@@ -781,8 +811,21 @@ class Strategy(qoc.PersistableMixin):
                     latest_paras[f"{stat}_selected_w{w}"] = (
                         self.std[l_coin][w] + self.std[s_coin][w]
                     ) / 2
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = (
+                        self.std[l_coin][w] - self.std[s_coin][w]
+                    ) / 2
                     latest_paras[f"{stat}_all_w{w}"] = np.mean(
                         [self.std[symbol][w] for symbol in self.symbols]
+                    )
+                elif stat == "bb":
+                    latest_paras[f"{stat}_selected_w{w}"] = (
+                        self.bb[l_coin][w] + self.bb[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = (
+                        self.bb[l_coin][w] - self.bb[s_coin][w]
+                    ) / 2
+                    latest_paras[f"{stat}_all_w{w}"] = np.mean(
+                        [self.bb[symbol][w] for symbol in self.symbols]
                     )
                 else:
                     latest_paras[f"{stat}_selected_w{w}"] = 0
@@ -1004,8 +1047,8 @@ def main(cfg: Config) -> None:
         qoc.set_clock(
             qoc.ClockOffline(
                 "1m",
-                start="2026-02-17T15:39:42.034643+0000",
-                end="2026-02-18T11:10:54.510203+0000",
+                start="2026-02-14",
+                end="2026-02-22",
             )
         )
         api = ApiUsdsOffline()
