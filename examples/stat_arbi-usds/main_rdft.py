@@ -1036,8 +1036,8 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
-    qoc.logging.init()
+    # cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
+    # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
         qoc.set_clock(qoc.ClockOnline("1m"))
