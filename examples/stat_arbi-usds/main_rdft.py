@@ -20,7 +20,7 @@ from pendulum import DateTime, Duration
 import qoc
 import qoc.logging
 from qoc.api.usds import ApiUsds, ApiUsdsOffline, ApiUsdsOnline
-from qoc.api.usds.models import Account, MarginType
+from qoc.api.usds.models import Account, MarginType, OrderResponse, OrderSide
 from qoc.typing import SymbolName
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ class Strategy(qoc.PersistableMixin):
     )
 
     windows_ratio = [0.25, 0.5, 1, 4, 16, 64, 256]
-    preload_window: int = 30
+    preload_window: int = 30720
 
     forward_window: Duration = attrs.field(
         factory=lambda: pendulum.duration(minutes=30)
@@ -193,7 +193,7 @@ class Strategy(qoc.PersistableMixin):
     stop_loss: float = 0.04
     take_profit: float = 0.04
 
-    freeze_window: int = 30  # in minutes
+    freeze_window: int = 60  # in minutes
 
     # --------------------------------- State -------------------------------- #
     orders: deque[Order] = attrs.field(factory=deque)
@@ -364,6 +364,7 @@ class Strategy(qoc.PersistableMixin):
             self.lows[symbol][w].append(low)
 
             self.closes[symbol][w].append(self.coin_closes[symbol][-1])
+            self.close_sqr[symbol][w].append(self.coin_closes[symbol][-1] ** 2)
 
             # states
             self.log_close_tail_minus_head[symbol][w] = (
@@ -383,7 +384,7 @@ class Strategy(qoc.PersistableMixin):
             self.lows_min[symbol][w] = self.rolling_min[symbol][w].update(low)
 
             self.closes_sum[symbol][w] += self.closes[symbol][w][-1] - (self.closes[symbol][w][0] if len(self.closes[symbol][w]) >= w else 0)
-            self.close_sqr_sum[symbol][w] += self.close_sqr[symbol][w][-1] - (self.close_sqr[symbol][w][0] if len(self.close_sqr[symbol][w]) >= w else 0)          
+            self.closes_sqr_sum[symbol][w] += self.close_sqr[symbol][w][-1] - (self.close_sqr[symbol][w][0] if len(self.close_sqr[symbol][w]) >= w else 0)          
 
             self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (
                 self.log_close_diff[symbol][w][0]
@@ -421,7 +422,7 @@ class Strategy(qoc.PersistableMixin):
                 self.tr_sum[symbol][w] / w if self.tr_sum[symbol][w] != 0 else 0
             )
 
-            self.bb[symbol][w] = (price - self.closes_sum[symbol][w] / w) / (np.sqrt(self.close_sqr_sum[symbol][w] / w - (self.closes_sum[symbol][w] / w)**2)) if self.close_sqr_sum[symbol][w] != 0 else 0
+            self.bb[symbol][w] = (price - self.closes_sum[symbol][w] / w) / (np.sqrt(self.closes_sqr_sum[symbol][w] / w - (self.closes_sum[symbol][w] / w)**2)) if self.closes_sqr_sum[symbol][w] != 0 else 0
 
 
             self.std[symbol][w] = (
@@ -461,7 +462,7 @@ class Strategy(qoc.PersistableMixin):
             self.highs_max,
             self.lows_min,
             self.closes_sum, 
-            self.close_sqr_sum,
+            self.closes_sqr_sum,
             self.log_close_diff_sum,
             self.log_close_diff_sqr_sum,
         ]:
@@ -829,6 +830,7 @@ class Strategy(qoc.PersistableMixin):
                     )
                 else:
                     latest_paras[f"{stat}_selected_w{w}"] = 0
+                    latest_paras[f"{stat}_selected_mns_w{w}"] = 0
                     latest_paras[f"{stat}_all_w{w}"] = 0
 
         paras_df = pd.DataFrame([latest_paras])
@@ -841,37 +843,37 @@ class Strategy(qoc.PersistableMixin):
         if (
             q_l > 0
             and q_s > 0
-            and self.y_pred > 15
+            and self.y_pred >25
             and len(self.orders) < self.max_concurrent_orders
             and self.freeze == 0
         ):
             self.count += 1
             # long
-            # response_l: OrderResponse = self.api.order_market(
-            #     l_coin, OrderSide.BUY, quantity=q_l
-            # )
-            # # short
-            # response_s: OrderResponse = self.api.order_market(
-            #     s_coin, OrderSide.SELL, quantity=q_s
-            # )
+            response_l: OrderResponse = self.api.order_market(
+                l_coin, OrderSide.BUY, quantity=q_l
+            )
+            # short
+            response_s: OrderResponse = self.api.order_market(
+                s_coin, OrderSide.SELL, quantity=q_s
+            )
 
-            # self.temp += price_l_now * (
-            #     q_l - float(abs(response_l.orig_qty))
-            # ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
+            self.temp += price_l_now * (
+                q_l - float(abs(response_l.orig_qty))
+            ) + price_s_now * (float(abs(response_s.orig_qty)) - q_s)
 
-            # logger.warning("Placed BUY order: %s", response_l)
-            # self.orders.append(
-            #     Order(
-            #         price_l=price_l_now,
-            #         quantity_l=abs(response_l.orig_qty),
-            #         symbol_l=l_coin,
-            #         time_l=response_l.update_time,
-            #         price_s=price_s_now,
-            #         quantity_s=abs(response_s.orig_qty),
-            #         symbol_s=s_coin,
-            #         time_s=response_s.update_time,
-            #     )
-            # )
+            logger.warning("Placed BUY order: %s", response_l)
+            self.orders.append(
+                Order(
+                    price_l=price_l_now,
+                    quantity_l=abs(response_l.orig_qty),
+                    symbol_l=l_coin,
+                    time_l=response_l.update_time,
+                    price_s=price_s_now,
+                    quantity_s=abs(response_s.orig_qty),
+                    symbol_s=s_coin,
+                    time_s=response_s.update_time,
+                )
+            )
 
         orders = self.orders
         orders_to_process = list(orders)
@@ -931,15 +933,15 @@ class Strategy(qoc.PersistableMixin):
                 or order_profit / self.bullet_size >= self.take_profit
             ):
                 # Close long position
-                # response_l = self.api.order_market(
-                #     order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
-                # )
-                # logger.warning("Closed LONG order: %s", response_l)
+                response_l = self.api.order_market(
+                    order.symbol_l, OrderSide.SELL, quantity=abs(order.quantity_l)
+                )
+                logger.warning("Closed LONG order: %s", response_l)
                 # Close short position
-                # response_s = self.api.order_market(
-                #     order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
-                # )
-                # logger.warning("Closed SHORT order: %s", response_s)
+                response_s = self.api.order_market(
+                    order.symbol_s, OrderSide.BUY, quantity=abs(order.quantity_s)
+                )
+                logger.warning("Closed SHORT order: %s", response_s)
                 logger.warning("Closed order: %s, profit: %f", order, order_profit)
 
                 self.orders.remove(order)
@@ -973,46 +975,46 @@ class Strategy(qoc.PersistableMixin):
             }
         self.temps.append(self.y_pred)
 
-        # if self.t % 60 == 0:
-        #     logger.info(
-        #         "Logging stats at step %d: count: %d: temp: %f",
-        #         step,
-        #         self.count,
-        #         self.y_pred,
-        #     )
-        #     import matplotlib.pyplot as plt
+        if self.t % 60 == 0:
+            logger.info(
+                "Logging stats at step %d: count: %d: temp: %f",
+                step,
+                self.count,
+                self.y_pred,
+            )
+            import matplotlib.pyplot as plt
 
-        #     # Create figure with 2 subplots
-        #     fig, ax = plt.subplots(figsize=(12, 6))
+            # Create figure with 2 subplots
+            fig, ax = plt.subplots(figsize=(12, 6))
 
-        #     # ===== First subplot: Asset balance and price =====
-        #     # Plot asset balance on primary y-axis
-        #     for asset_name, balance_history in self.asset_history.items():
-        #         ax.plot(
-        #             range(len(balance_history)),
-        #             balance_history,
-        #             "-",
-        #             label=f"{asset_name} Balance",
-        #         )
-        #     ax.set_xlabel("Time Steps")
-        #     ax.set_ylabel("Balance (USDT)", color="tab:blue")
-        #     ax.tick_params(axis="y", labelcolor="tab:blue")
-        #     ax.legend()
+            # ===== First subplot: Asset balance and price =====
+            # Plot asset balance on primary y-axis
+            for asset_name, balance_history in self.asset_history.items():
+                ax.plot(
+                    range(len(balance_history)),
+                    balance_history,
+                    "-",
+                    label=f"{asset_name} Balance",
+                )
+            ax.set_xlabel("Time Steps")
+            ax.set_ylabel("Balance (USDT)", color="tab:blue")
+            ax.tick_params(axis="y", labelcolor="tab:blue")
+            ax.legend()
 
-        #     plt.savefig("examples/stat_arbi-usds/asset_metrics.png")
-        #     plt.close()  # 关闭图表释放内存
+            plt.savefig("examples/stat_arbi-usds/asset_metrics.png")
+            plt.close()  # 关闭图表释放内存
 
-        #     # plot temps
-        #     plt.figure(figsize=(10, 5))
-        #     plt.plot(
-        #         range(len(self.temps)), self.temps, label="Temp Value", color="orange"
-        #     )
-        #     plt.xlabel("Time Steps")
-        #     plt.ylabel("Temp Value")
-        #     plt.title("Temp Value Over Time")
-        #     plt.legend()
-        #     plt.savefig("examples/stat_arbi-usds/temp_values.png")
-        #     plt.close()
+            # plot temps
+            plt.figure(figsize=(10, 5))
+            plt.plot(
+                range(len(self.temps)), self.temps, label="Temp Value", color="orange"
+            )
+            plt.xlabel("Time Steps")
+            plt.ylabel("Temp Value")
+            plt.title("Temp Value Over Time")
+            plt.legend()
+            plt.savefig("examples/stat_arbi-usds/temp_values.png")
+            plt.close()
 
         if self.t % 10 == 0:
             self.data_logger.dump()
@@ -1067,8 +1069,8 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    cherries.main(main)
-    # main(Config())
+    # cherries.main(main)
+    main(Config())
 
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/stat_arbi-usds/main_rdft.py
