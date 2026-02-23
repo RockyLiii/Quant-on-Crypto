@@ -193,7 +193,10 @@ class Strategy(qoc.PersistableMixin):
     stop_loss: float = 0.04
     take_profit: float = 0.04
 
-    freeze_window: int = 60  # in minutes
+    freeze_window: int = 120  # in minutes
+
+    y_pred_deque_maxlen: int = 1440
+
 
     # --------------------------------- State -------------------------------- #
     orders: deque[Order] = attrs.field(factory=deque)
@@ -287,11 +290,17 @@ class Strategy(qoc.PersistableMixin):
 
     # temp:
     y_pred: float = 0.0
+    y_pred_deque: deque[float] = attrs.field(factory=deque)
+    y_pred_ma: float = 0.0
+
     count: int = 0
 
     freeze: int = 0
 
     data_logger: DataLogger = attrs.field(factory=DataLogger)
+
+    log_dict = {}
+
 
     def update_indicators(
         self,
@@ -419,7 +428,7 @@ class Strategy(qoc.PersistableMixin):
             )
 
             self.atr[symbol][w] = (
-                self.tr_sum[symbol][w] / w if self.tr_sum[symbol][w] != 0 else 0
+                self.tr_sum[symbol][w] / w / price if self.tr_sum[symbol][w] != 0 else 0
             )
 
             self.bb[symbol][w] = (price - self.closes_sum[symbol][w] / w) / (np.sqrt(self.closes_sqr_sum[symbol][w] / w - (self.closes_sum[symbol][w] / w)**2)) if self.closes_sqr_sum[symbol][w] != 0 else 0
@@ -527,6 +536,8 @@ class Strategy(qoc.PersistableMixin):
 
         btc_prices = btc_klines["close"].to_list()
         btc_volumes = btc_klines["volume"].to_list()
+
+        self.y_pred_deque = deque(maxlen=self.y_pred_deque_maxlen)
 
         # Keep track of symbols that fail to load data
         symbols_to_remove = []
@@ -835,15 +846,24 @@ class Strategy(qoc.PersistableMixin):
 
         paras_df = pd.DataFrame([latest_paras])
         paras_rerank = paras_df[self.feature_order]
+
+        self.log_dict[now] = paras_rerank
+
         for col in self.feature_order:
             paras_rerank[col] = paras_df[col]
         self.y_pred = self.model_trained.predict(paras_rerank)[0]
         self.data_logger.append("y_pred", self.y_pred)
 
+        self.y_pred_deque.append(self.y_pred)
+        self.y_pred_ma = np.mean(self.y_pred_deque) if len(self.y_pred_deque) > 0 else 0
+
+
+        self.y_pred -= self.y_pred_ma
+
         if (
             q_l > 0
             and q_s > 0
-            and self.y_pred >25
+            and self.y_pred >30
             and len(self.orders) < self.max_concurrent_orders
             and self.freeze == 0
         ):
@@ -1016,8 +1036,21 @@ class Strategy(qoc.PersistableMixin):
             plt.savefig("examples/stat_arbi-usds/temp_values.png")
             plt.close()
 
-        if self.t % 10 == 0:
+        if self.t % 100 == 0:
             self.data_logger.dump()
+
+            log_df_list = []
+
+            for timestamp, df_row in self.log_dict.items():
+                # 为每行添加时间戳作为索引
+                df_row_copy = df_row.copy()
+                df_row_copy.index = [timestamp]
+                log_df_list.append(df_row_copy)
+
+            # 合并所有行
+            log_df = pd.concat(log_df_list, axis=0)
+            log_df.to_csv("examples/stat_arbi-usds/log_ltst.csv")
+            
 
         cherries.log_metrics(
             {
@@ -1049,8 +1082,8 @@ def main(cfg: Config) -> None:
         qoc.set_clock(
             qoc.ClockOffline(
                 "1m",
-                start="2026-02-14",
-                end="2026-02-22",
+                start="2026-02-09",
+                end="2026-02-25",
             )
         )
         api = ApiUsdsOffline()
