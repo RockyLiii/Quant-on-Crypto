@@ -190,10 +190,10 @@ class Strategy(qoc.PersistableMixin):
     bullet_size: float = 100
     max_concurrent_orders: int = 2
 
-    stop_loss: float = 0.04
-    take_profit: float = 0.04
+    stop_loss: float = 0.01
+    take_profit: float = 0.05
 
-    freeze_window: int = 120  # in minutes
+    freeze_window: int = 30  # in minutes
 
     y_pred_deque_maxlen: int = 1440
 
