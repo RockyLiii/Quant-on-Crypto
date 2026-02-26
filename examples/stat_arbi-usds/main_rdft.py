@@ -1103,8 +1103,8 @@ def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    # cherries.main(main)
-    main(Config())
+    cherries.main(main)
+    # main(Config())
 
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/stat_arbi-usds/main_rdft.py
