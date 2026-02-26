@@ -190,7 +190,7 @@ class Strategy(qoc.PersistableMixin):
     bullet_size: float = 100
     max_concurrent_orders: int = 2
 
-    stop_loss: float = 0.01
+    stop_loss: float = 0.025
     take_profit: float = 0.05
 
     freeze_window: int = 30  # in minutes
@@ -963,6 +963,7 @@ class Strategy(qoc.PersistableMixin):
                 )
                 logger.warning("Closed SHORT order: %s", response_s)
                 logger.warning("Closed order: %s, profit: %f", order, order_profit)
+                logger.warning("Current count: %d", self.count)
 
                 self.orders.remove(order)
 
@@ -1082,7 +1083,7 @@ def main(cfg: Config) -> None:
         qoc.set_clock(
             qoc.ClockOffline(
                 "1m",
-                start="2026-02-09",
+                start="2026-02-22",
                 end="2026-02-25",
             )
         )
