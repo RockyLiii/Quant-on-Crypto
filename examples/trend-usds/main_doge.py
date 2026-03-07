@@ -42,7 +42,7 @@ class Strategy(qoc.PersistableMixin):
     bullet_size: float = 50
     """单次下单资金 (USDT)"""
 
-    max_holdings: int = 1
+    max_holdings: int = 3
     """单标最大持仓 (单)"""
 
     window_ma = 24*60

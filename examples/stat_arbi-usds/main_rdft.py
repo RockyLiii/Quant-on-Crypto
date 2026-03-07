@@ -188,7 +188,7 @@ class Strategy(qoc.PersistableMixin):
     back_window: Duration = attrs.field(factory=lambda: pendulum.duration(minutes=120))
 
     bullet_size: float = 100
-    max_concurrent_orders: int = 2
+    max_concurrent_orders: int = 4
 
     stop_loss: float = 0.025
     take_profit: float = 0.05
@@ -1084,7 +1084,7 @@ def main(cfg: Config) -> None:
             qoc.ClockOffline(
                 "1m",
                 start="2026-02-22",
-                end="2026-02-25",
+                end="2026-03-25",
             )
         )
         api = ApiUsdsOffline()

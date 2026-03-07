@@ -35,10 +35,10 @@ class Strategy(qoc.PersistableMixin):
 
     # -------------------------------- Config -------------------------------- #
 
-    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=24))
+    past_window: Duration = attrs.field(factory=lambda: pendulum.duration(hours=8))
     """过去窗口"""
 
-    bullet_size: float = 30
+    bullet_size: float = 90
     """单次下单资金 (USDT)"""
 
     max_holdings: int = 1
@@ -90,7 +90,7 @@ class Strategy(qoc.PersistableMixin):
     )
     """Third derivative of VWAP for each symbol"""
 
-    past_window_length: int = attrs.field(default=1 * 24 * 60)
+    past_window_length: int = attrs.field(default=1 * 8 * 60)
 
     # Track last logged date for daily logging
     last_logged_date: str = attrs.field(default="")
@@ -174,7 +174,7 @@ class Strategy(qoc.PersistableMixin):
 
             if (
                 self.vwaps_deri_1[symbol][-1] > 0
-                and self.vwaps_deri_2[symbol][-1] > 0
+                and self.vwaps_deri_2[symbol][-1] > 0.005
                 # and self.vwaps_deri_3[symbol][-1] > 0
                 and len(orders) < self.max_holdings
             ):
@@ -195,7 +195,7 @@ class Strategy(qoc.PersistableMixin):
 
             if (
                 self.vwaps_deri_1[symbol][-1] < 0
-                and self.vwaps_deri_2[symbol][-1] < 0
+                and self.vwaps_deri_2[symbol][-1] < -0.005
                 # and self.vwaps_deri_3[symbol][-1] < 0
                 and len(orders) < self.max_holdings
             ):
@@ -383,7 +383,7 @@ def main(cfg: Config) -> None:
         qoc.set_clock(qoc.ClockOnline("1m"))
         api = ApiUsdsOnline()
     else:
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-25", end="2026-12-21"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-02-01", end="2026-12-21"))
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
     strategy.init()
@@ -406,3 +406,4 @@ if __name__ == "__main__":
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main_doge.py
 
 # BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python deploy/trend/main_doge.py
+

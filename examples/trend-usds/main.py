@@ -347,7 +347,7 @@ class Strategy(qoc.PersistableMixin):
             ax3.axhline(y=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
 
             plt.tight_layout()
-            plt.savefig("examples/trend-usds/asset_metrics.png")
+            plt.savefig("examples/trend-usds/asset_metrics_0303.png")
             plt.close()  # 关闭图表释放内存
         stats: dict[str, dict[str, float]] = {}
         for symbol in self.symbols:
@@ -383,7 +383,7 @@ def main(cfg: Config) -> None:
         api = ApiUsdsOnline()
     else:
         # qoc.set_clock(qoc.ClockOffline("1m", start="2025-10-15", end="2025-12-21"))
-        qoc.set_clock(qoc.ClockOffline("1m", start="2025-11-25", end="2026-02-09"))
+        qoc.set_clock(qoc.ClockOffline("1m", start="2025-11-25", end="2026-12-09"))
 
         api = ApiUsdsOffline()
     strategy = Strategy(api=api)
@@ -403,5 +403,7 @@ if __name__ == "__main__":
     # cherries.main(main)
     main(Config())
 
-# BINANCE_USDS_BASE_URL="https://fapi.binance.com" /opt/anaconda3/bin/python examples/trend-usds/main.py
 
+# BINANCE_USDS_BASE_URL="https://fapi.binance.com" ./.venv/bin/python examples/trend-usds/main.py
+
+# BINANCE_BASE_URL='https://api.binance.us' ./.venv/bin/python examples/trend-usds/main.py     /Users/lizeyu/Desktop/Quant-on-Crypto/deploy/trend/main.py
