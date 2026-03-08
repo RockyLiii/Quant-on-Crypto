@@ -197,7 +197,6 @@ class Strategy(qoc.PersistableMixin):
 
     y_pred_deque_maxlen: int = 1440
 
-
     # --------------------------------- State -------------------------------- #
     orders: deque[Order] = attrs.field(factory=deque)
 
@@ -273,7 +272,7 @@ class Strategy(qoc.PersistableMixin):
     # bb
     closes: dict[str, dict] = attrs.field(factory=dict)
     close_sqr: dict[str, dict] = attrs.field(factory=dict)
-    
+
     closes_sum: dict[str, dict] = attrs.field(factory=dict)
     closes_sqr_sum: dict[str, dict] = attrs.field(factory=dict)
 
@@ -300,7 +299,6 @@ class Strategy(qoc.PersistableMixin):
     data_logger: DataLogger = attrs.field(factory=DataLogger)
 
     log_dict = {}
-
 
     def update_indicators(
         self,
@@ -392,8 +390,14 @@ class Strategy(qoc.PersistableMixin):
 
             self.lows_min[symbol][w] = self.rolling_min[symbol][w].update(low)
 
-            self.closes_sum[symbol][w] += self.closes[symbol][w][-1] - (self.closes[symbol][w][0] if len(self.closes[symbol][w]) >= w else 0)
-            self.closes_sqr_sum[symbol][w] += self.close_sqr[symbol][w][-1] - (self.close_sqr[symbol][w][0] if len(self.close_sqr[symbol][w]) >= w else 0)          
+            self.closes_sum[symbol][w] += self.closes[symbol][w][-1] - (
+                self.closes[symbol][w][0] if len(self.closes[symbol][w]) >= w else 0
+            )
+            self.closes_sqr_sum[symbol][w] += self.close_sqr[symbol][w][-1] - (
+                self.close_sqr[symbol][w][0]
+                if len(self.close_sqr[symbol][w]) >= w
+                else 0
+            )
 
             self.log_close_diff_sum[symbol][w] += self.log_close_diff[symbol][w][-1] - (
                 self.log_close_diff[symbol][w][0]
@@ -431,8 +435,17 @@ class Strategy(qoc.PersistableMixin):
                 self.tr_sum[symbol][w] / w / price if self.tr_sum[symbol][w] != 0 else 0
             )
 
-            self.bb[symbol][w] = (price - self.closes_sum[symbol][w] / w) / (np.sqrt(self.closes_sqr_sum[symbol][w] / w - (self.closes_sum[symbol][w] / w)**2)) if self.closes_sqr_sum[symbol][w] != 0 else 0
-
+            self.bb[symbol][w] = (
+                (price - self.closes_sum[symbol][w] / w)
+                / (
+                    np.sqrt(
+                        self.closes_sqr_sum[symbol][w] / w
+                        - (self.closes_sum[symbol][w] / w) ** 2
+                    )
+                )
+                if self.closes_sqr_sum[symbol][w] != 0
+                else 0
+            )
 
             self.std[symbol][w] = (
                 np.sqrt(
@@ -470,7 +483,7 @@ class Strategy(qoc.PersistableMixin):
             self.tr_sum,
             self.highs_max,
             self.lows_min,
-            self.closes_sum, 
+            self.closes_sum,
             self.closes_sqr_sum,
             self.log_close_diff_sum,
             self.log_close_diff_sqr_sum,
@@ -731,20 +744,28 @@ class Strategy(qoc.PersistableMixin):
             float(coef_df.loc[l_coin, "residual_z"])
             + float(coef_df.loc[s_coin, "residual_z"])
         ) / 2
-        residual_z_selected_mns = (float(coef_df.loc[l_coin, 'residual_z']) - float(coef_df.loc[s_coin, 'residual_z'])) / 2
+        residual_z_selected_mns = (
+            float(coef_df.loc[l_coin, "residual_z"])
+            - float(coef_df.loc[s_coin, "residual_z"])
+        ) / 2
 
         residual_sign = np.abs((coef_df["residual"] > 0).sum() - 0.5 * len(coef_df))
         corr_all = coef_df["corr"].mean()
         corr_selected = (
             float(coef_df.loc[l_coin, "corr"]) + float(coef_df.loc[s_coin, "corr"])
         ) / 2
-        corr_selected_mns = (float(coef_df.loc[l_coin, "corr"]) - float(coef_df.loc[s_coin, "corr"])) / 2
+        corr_selected_mns = (
+            float(coef_df.loc[l_coin, "corr"]) - float(coef_df.loc[s_coin, "corr"])
+        ) / 2
         coef_adj_all = coef_df["beta_adj"].mean()
         coef_adj_selected = (
             float(coef_df.loc[l_coin, "beta_adj"])
             + float(coef_df.loc[s_coin, "beta_adj"])
         ) / 2
-        coef_adj_selected_mns = (float(coef_df.loc[l_coin, "beta_adj"]) - float(coef_df.loc[s_coin, "beta_adj"])) / 2
+        coef_adj_selected_mns = (
+            float(coef_df.loc[l_coin, "beta_adj"])
+            - float(coef_df.loc[s_coin, "beta_adj"])
+        ) / 2
 
         q_l = self.bullet_size / 2 / price_l_now
         q_s = self.bullet_size / 2 / price_s_now
@@ -857,13 +878,12 @@ class Strategy(qoc.PersistableMixin):
         self.y_pred_deque.append(self.y_pred)
         self.y_pred_ma = np.mean(self.y_pred_deque) if len(self.y_pred_deque) > 0 else 0
 
-
         self.y_pred -= self.y_pred_ma
 
         if (
             q_l > 0
             and q_s > 0
-            and self.y_pred >30
+            and self.y_pred > 30
             and len(self.orders) < self.max_concurrent_orders
             and self.freeze == 0
         ):
@@ -1051,7 +1071,6 @@ class Strategy(qoc.PersistableMixin):
             # 合并所有行
             log_df = pd.concat(log_df_list, axis=0)
             log_df.to_csv("examples/stat_arbi-usds/log_ltst.csv")
-            
 
         cherries.log_metrics(
             {
@@ -1072,7 +1091,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    # cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
+    cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
