@@ -1016,7 +1016,8 @@ class Strategy(qoc.PersistableMixin):
             }
         self.temps.append(self.y_pred)
 
-        if self.t % 60 == 0:
+        # if self.t % 60 == 0:
+        if False:  # disable plotting
             logger.info(
                 "Logging stats at step %d: count: %d: temp: %f",
                 step,
@@ -1091,7 +1092,7 @@ class Config(cherries.BaseConfig):
 
 
 def main(cfg: Config) -> None:
-    cherries.log_param("group_key", "stat_arbi-usds 2026-02-14")
+    cherries.log_param("group_key", "stat_arbi-usds 2026-03-12")
     # qoc.logging.init()
     api: ApiUsds
     if cfg.online:
